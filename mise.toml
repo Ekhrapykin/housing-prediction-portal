@@ -1,8 +1,7 @@
-# Add market-api (./mvnw) and web (npm) tasks when those folders land.
 [tools]
 python = "3.14"
 uv = "latest"
-java = "temurin-25"
+java = "temurin-21"
 node = "26"
 
 [tasks.train]
@@ -20,11 +19,27 @@ description = "Run estimator-api on :8001"
 dir = "estimator-api"
 run = "uv run uvicorn app.main:app --port 8001"
 
+[tasks."dev:market"]
+description = "Run market-api on :8080"
+dir = "market-api"
+run = "./gradlew bootRun"
+
+[tasks."dev:web"]
+description = "Run the Next.js portal on :3000"
+dir = "web"
+run = "npm run dev"
+
+[tasks."lint:web"]
+description = "Lint and typecheck the Next.js portal"
+dir = "web"
+run = "npm run lint && npx tsc --noEmit"
+
 [tasks.test]
-description = "Run pytest in both Python services"
+description = "Run pytest in both Python services and gradle test in market-api"
 run = [
   "cd ml-api && uv run pytest -q",
   "cd estimator-api && uv run pytest -q",
+  "cd market-api && ./gradlew test",
 ]
 
 [tasks.up]

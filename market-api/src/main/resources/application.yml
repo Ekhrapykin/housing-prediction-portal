@@ -1,0 +1,16 @@
+server.port: 8080
+ml.api.url: ${ML_API_URL:http://localhost:8000}
+spring:
+  application.name: market-api
+  jackson.property-naming-strategy: SNAKE_CASE
+  threads.virtual.enabled: true
+  datasource.url: jdbc:h2:mem:market;DB_CLOSE_DELAY=-1
+  h2.console.enabled: false
+  jpa:
+    open-in-view: false
+    hibernate.ddl-auto: create-drop
+  cache:
+    type: caffeine
+    caffeine.spec: maximumSize=500,expireAfterWrite=10m
+  data.web.pageable.max-page-size: 200
+management.endpoints.web.exposure.include: health

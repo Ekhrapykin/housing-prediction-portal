@@ -9,3 +9,10 @@ target/
 .env*.local
 .DS_Store
 Interview Tasks Fullstack.pdf
+# Local build plans (not part of the deliverable)
+PLAN.md
+plan/
+.idea/
+market-api/build/
+market-api/.gradle/
+market-api/bin/
