@@ -1,0 +1,32 @@
+# Add market-api (./mvnw) and web (npm) tasks when those folders land.
+[tools]
+python = "3.14"
+uv = "latest"
+java = "temurin-25"
+node = "26"
+
+[tasks.train]
+description = "Train the ml-api model"
+dir = "ml-api"
+run = "uv run python -m app.ml.train"
+
+[tasks."dev:ml"]
+description = "Run ml-api on :8000"
+dir = "ml-api"
+run = "uv run uvicorn app.main:app --port 8000"
+
+[tasks."dev:estimator"]
+description = "Run estimator-api on :8001"
+dir = "estimator-api"
+run = "uv run uvicorn app.main:app --port 8001"
+
+[tasks.test]
+description = "Run pytest in both Python services"
+run = [
+  "cd ml-api && uv run pytest -q",
+  "cd estimator-api && uv run pytest -q",
+]
+
+[tasks.up]
+description = "Build and start everything with docker compose"
+run = "docker compose up --build"
