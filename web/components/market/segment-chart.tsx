@@ -22,6 +22,25 @@ export function SegmentChart({ data, by }: { data: SegmentRow[]; by: SegmentKey 
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
+      <table className="sr-only">
+        <caption>Average price by {by.replace("_", " ").toLowerCase()}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Segment</th>
+            <th scope="col">Properties</th>
+            <th scope="col">Average price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((d) => (
+            <tr key={d.segment}>
+              <th scope="row">{d.segment}</th>
+              <td>{d.count}</td>
+              <td>{money(d.avg_price)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </Card>
   );
 }

@@ -1,10 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
-import type { ModelInfo } from "@/lib/types";
+"use client";
 
-export const useModelInfo = () =>
-  useQuery({
-    queryKey: ["model-info"],
-    queryFn: () => apiFetch<ModelInfo>("/api/estimator/model-info"),
-    staleTime: 10 * 60_000,
-  });
+import { useQuery } from "@tanstack/react-query";
+import { queries } from "@/lib/data/queries";
+
+export const useModelInfo = () => useQuery(queries.modelInfo());

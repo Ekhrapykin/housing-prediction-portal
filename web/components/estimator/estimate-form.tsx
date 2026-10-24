@@ -54,7 +54,7 @@ export function EstimateForm() {
                   {...form.register("label")}
                 />
                 <p className="min-h-4" />
-                <p id="est-label-error" className="text-xs text-destructive">
+                <p id="est-label-error" aria-live="polite" className="text-xs text-destructive">
                   {form.formState.errors.label?.message}
                 </p>
               </div>

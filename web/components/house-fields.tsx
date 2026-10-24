@@ -47,7 +47,7 @@ export function HouseFields({
             <p id={`${id}-hint`} className="min-h-4 text-xs text-muted-foreground">
               {stat && `Typical: ${featureValue(f.name, stat.min)}–${featureValue(f.name, stat.max)}`}
             </p>
-            <p id={`${id}-error`} className="text-xs text-destructive">
+            <p id={`${id}-error`} aria-live="polite" className="text-xs text-destructive">
               {error}
             </p>
           </div>

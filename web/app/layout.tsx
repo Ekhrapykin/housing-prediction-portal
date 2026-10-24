@@ -24,7 +24,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </a>
         <Providers>
           <Nav />
-          <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+          <main id="main" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
             {children}
           </main>
         </Providers>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ErrorState } from "@/components/error-state";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -34,6 +35,12 @@ export function CompareView({ ids }: { ids: number[] }) {
   const bestPrice = best((e) => e.price, "min");
   const bestSchool = best((e) => e.features.school_rating, "max");
   const hl = "bg-green-100 font-semibold text-green-900 dark:bg-green-900/30 dark:text-green-200";
+  // Colour alone isn't enough (WCAG 1.4.1): the cell also carries a text badge.
+  const bestBadge = (
+    <Badge variant="outline" className="ml-2 border-green-700 text-green-900">
+      Best<span className="sr-only"> value in this row</span>
+    </Badge>
+  );
 
   return (
     <div className="space-y-6">
@@ -59,6 +66,7 @@ export function CompareView({ ids }: { ids: number[] }) {
                     className={cn("text-right tabular-nums", f.name === "school_rating" && e.features.school_rating === bestSchool && hl)}
                   >
                     {featureValue(f.name, e.features[f.name])}
+                    {f.name === "school_rating" && e.features.school_rating === bestSchool && bestBadge}
                   </TableCell>
                 ))}
               </TableRow>
@@ -68,6 +76,7 @@ export function CompareView({ ids }: { ids: number[] }) {
               {data.map((e) => (
                 <TableCell key={e.id} className={cn("text-right tabular-nums", e.price === bestPrice && hl)}>
                   {money(e.price)}
+                  {e.price === bestPrice && bestBadge}
                 </TableCell>
               ))}
             </TableRow>

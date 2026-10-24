@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,11 +16,24 @@ function NumberFilter({ name, label, step, filters }: { name: string; label: str
   const urlValue = filters.get(name);
   const [value, setValue] = useState(urlValue);
   const debounced = useDebounce(value, 400);
+  const lastSent = useRef(urlValue); // the last value this input put in the URL (or took from it)
   const { set } = filters;
+
   useEffect(() => {
-    if (debounced !== urlValue) set({ [name]: debounced });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to the debounced input, not to URL echoes
-  }, [debounced]);
+    if (debounced !== lastSent.current) {
+      lastSent.current = debounced;
+      set({ [name]: debounced });
+    }
+  }, [debounced, name, set]);
+
+  // A URL value we didn't send (Back/Forward, Reset) wins over what's typed.
+  useEffect(() => {
+    if (urlValue !== lastSent.current) {
+      lastSent.current = urlValue;
+      setValue(urlValue);
+    }
+  }, [urlValue]);
+
   return (
     <div className="space-y-1.5">
       <Label htmlFor={`f-${name}`}>{label}</Label>
@@ -32,11 +45,9 @@ function NumberFilter({ name, label, step, filters }: { name: string; label: str
 /** Filter bar + the server-rendered dashboard (children), dimmed while the server re-renders. */
 export function Filters({ children }: { children: React.ReactNode }) {
   const filters = useMarketFilters();
-  const [resetCount, setResetCount] = useState(0);
   return (
     <>
       <form
-        key={resetCount}
         onSubmit={(e) => e.preventDefault()}
         aria-label="Market filters"
         className="mb-6 grid gap-4 rounded-lg border bg-card p-4 sm:grid-cols-3 lg:grid-cols-7"
@@ -67,14 +78,7 @@ export function Filters({ children }: { children: React.ReactNode }) {
           </NativeSelect>
         </div>
         <div className="flex items-end">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              filters.reset();
-              setResetCount((c) => c + 1);
-            }}
-          >
+          <Button type="button" variant="outline" onClick={filters.reset}>
             Reset
           </Button>
         </div>

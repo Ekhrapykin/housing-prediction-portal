@@ -4,33 +4,26 @@ import {
   columnFilteringFeature,
   createColumnHelper,
   createFilteredRowModel,
-  createPaginatedRowModel,
-  createSortedRowModel,
   filterFn_includesString,
   globalFilteringFeature,
-  rowPaginationFeature,
-  rowSortingFeature,
-  sortFn_basic,
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { Sort } from "@/lib/data/endpoints";
 import { money, number } from "@/lib/format";
-import type { Property } from "@/lib/types";
+import type { Page, Property } from "@/lib/types";
 
-// Module scope: v9 needs stable features/columns.
+// Module scope: v9 needs stable features/columns. Sorting and paging happen on the server (`?sort=`, `?page=`);
+// the table only filters the rows of the current page.
 const features = tableFeatures({
-  rowSortingFeature,
   columnFilteringFeature,
   globalFilteringFeature,
-  rowPaginationFeature,
-  sortedRowModel: createSortedRowModel(),
   filteredRowModel: createFilteredRowModel(),
-  paginatedRowModel: createPaginatedRowModel(),
-  sortFns: { basic: sortFn_basic },
   filterFns: { includesString: filterFn_includesString },
 });
 
@@ -58,22 +51,47 @@ const HIDDEN: Record<string, string> = {
 
 const ARIA_SORT = { asc: "ascending", desc: "descending" } as const;
 
-export function PropertiesTable({ data }: { data: Property[] }) {
+function PageLink({ href, disabled, children }: { href: string; disabled: boolean; children: React.ReactNode }) {
+  if (disabled)
+    return (
+      <Button variant="outline" size="sm" disabled>
+        {children}
+      </Button>
+    );
+  return (
+    <Link href={href} scroll={false} prefetch={false} className={buttonVariants({ variant: "outline", size: "sm" })}>
+      {children}
+    </Link>
+  );
+}
+
+/** `filters` are the market filters from the URL; links keep them and change only `page` / `sort`. */
+export function PropertiesTable({ data, sort, filters }: { data: Page<Property>; sort: Sort | null; filters: URLSearchParams }) {
   const table = useTable({
     features,
     columns,
-    data,
-    initialState: { pagination: { pageIndex: 0, pageSize: 15 } },
+    data: data.items,
     globalFilterFn: "includesString",
     getColumnCanGlobalFilter: () => true,
   });
-  const { pageIndex } = table.state.pagination;
+
+  const page = data.page + 1; // the backend is 0-based, the URL is 1-based
+  const lastPage = Math.max(Math.ceil(data.total / data.size), 1);
+  const first = data.page * data.size + 1;
+  const last = data.page * data.size + data.items.length;
+  const href = (patch: { page?: number; sort?: Sort }) => {
+    const q = new URLSearchParams(filters);
+    const s = patch.sort ?? sort;
+    if (s) q.set("sort", `${s.key},${s.dir}`);
+    if (patch.page && patch.page > 1) q.set("page", String(patch.page));
+    return `?${q}`;
+  };
 
   return (
     <div className="space-y-4">
       <Input
-        aria-label="Filter properties"
-        placeholder="Filter all columns…"
+        aria-label="Filter this page"
+        placeholder="Filter this page…"
         className="max-w-xs"
         value={(table.state.globalFilter as string | undefined) ?? ""}
         onChange={(e) => table.setGlobalFilter(e.target.value)}
@@ -84,18 +102,20 @@ export function PropertiesTable({ data }: { data: Property[] }) {
             {table.getHeaderGroups().map((group) => (
               <TableRow key={group.id}>
                 {group.headers.map((header) => {
-                  const sorted = header.column.getIsSorted();
-                  const Icon = sorted === "asc" ? ArrowUp : sorted === "desc" ? ArrowDown : ChevronsUpDown;
+                  const key = header.column.id as Sort["key"];
+                  const dir = sort?.key === key ? sort.dir : null;
+                  const Icon = dir === "asc" ? ArrowUp : dir === "desc" ? ArrowDown : ChevronsUpDown;
                   return (
-                    <TableHead key={header.id} aria-sort={sorted ? ARIA_SORT[sorted] : "none"} className={HIDDEN[header.column.id]}>
-                      <button
-                        type="button"
-                        onClick={header.column.getToggleSortingHandler()}
+                    <TableHead key={header.id} aria-sort={dir ? ARIA_SORT[dir] : "none"} className={HIDDEN[key]}>
+                      <Link
+                        href={href({ sort: { key, dir: dir === "asc" ? "desc" : "asc" } })}
+                        scroll={false}
+                        prefetch={false}
                         className="inline-flex items-center gap-1 rounded-sm font-medium hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
                       >
                         <table.FlexRender header={header} />
                         <Icon className="size-3.5 opacity-60" aria-hidden />
-                      </button>
+                      </Link>
                     </TableHead>
                   );
                 })}
@@ -124,15 +144,15 @@ export function PropertiesTable({ data }: { data: Property[] }) {
       </div>
       <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground">
-          Page {pageIndex + 1} of {Math.max(table.getPageCount(), 1)} · {table.getPrePaginatedRowModel().rows.length} rows
+          {data.total === 0 ? "No properties" : `Showing ${first}–${last} of ${data.total}`} · Page {page} of {lastPage}
         </span>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+          <PageLink href={href({ page: page - 1 })} disabled={page <= 1}>
             Previous
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+          </PageLink>
+          <PageLink href={href({ page: page + 1 })} disabled={page >= lastPage}>
             Next
-          </Button>
+          </PageLink>
         </div>
       </div>
     </div>

@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { money, number } from "@/lib/format";
 import type { Property } from "@/lib/types";
 
-export function PriceScatter({ data }: { data: Property[] }) {
+/** `total` is the number of matching properties; `data` may be a capped sample of them. */
+export function PriceScatter({ data, total }: { data: Property[]; total: number }) {
   return (
     <Card>
       <CardHeader>
@@ -22,6 +23,26 @@ export function PriceScatter({ data }: { data: Property[] }) {
           </ScatterChart>
         </ResponsiveContainer>
       </CardContent>
+      {total > data.length && <p className="px-4 text-xs text-muted-foreground">Showing the first {data.length} of {total} properties.</p>}
+      <table className="sr-only">
+        <caption>Price vs square footage</caption>
+        <thead>
+          <tr>
+            <th scope="col">Property</th>
+            <th scope="col">Square footage</th>
+            <th scope="col">Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((p) => (
+            <tr key={p.id}>
+              <th scope="row">#{p.id}</th>
+              <td>{number(p.square_footage)}</td>
+              <td>{money(p.price)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </Card>
   );
 }
