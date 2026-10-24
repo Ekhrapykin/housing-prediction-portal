@@ -1,0 +1,84 @@
+# Laptop: docker compose up --build
+# Pi:     docker compose pull && docker compose up -d --no-build
+x-common: &common
+  restart: unless-stopped
+
+services:
+  ml-api:
+    <<: *common
+    build: ./ml-api
+    image: ghcr.io/ekhrapykin/hpp-ml-api:${TAG:-latest}
+    # Published so Swagger (/docs) can be shown live.
+    ports: ["8000:8000"]
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+  estimator-api:
+    <<: *common
+    build: ./estimator-api
+    image: ghcr.io/ekhrapykin/hpp-estimator-api:${TAG:-latest}
+    # Published for Swagger demos; the portal reaches it over the compose network, so drop this in a locked-down setup.
+    ports: ["8001:8001"]
+    environment:
+      ML_API_URL: http://ml-api:8000
+      DB_PATH: /data/estimates.db
+    volumes: [estimator-data:/data]
+    mem_limit: 256m
+    depends_on:
+      ml-api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+  market-api:
+    <<: *common
+    build: ./market-api
+    image: ghcr.io/ekhrapykin/hpp-market-api:${TAG:-latest}
+    # Published for Swagger demos (/swagger-ui.html); the portal uses the compose network.
+    ports: ["8080:8080"]
+    environment:
+      ML_API_URL: http://ml-api:8000
+    mem_limit: 640m
+    depends_on:
+      ml-api: { condition: service_healthy }
+    healthcheck:
+      # temurin JRE images ship curl.
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 40s
+
+  web:
+    <<: *common
+    build:
+      context: ./web
+      args:
+        ESTIMATOR_API_URL: http://estimator-api:8001
+        MARKET_API_URL: http://market-api:8080
+    image: ghcr.io/ekhrapykin/hpp-web:${TAG:-latest}
+    ports: ["3000:3000"]
+    environment:
+      ESTIMATOR_API_URL: http://estimator-api:8001
+      MARKET_API_URL: http://market-api:8080
+    mem_limit: 384m
+    depends_on:
+      estimator-api: { condition: service_healthy }
+      market-api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  estimator-data:

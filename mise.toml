@@ -45,3 +45,7 @@ run = [
 [tasks.up]
 description = "Build and start everything with docker compose"
 run = "docker compose up --build"
+
+[tasks.down]
+description = "Stop the docker compose stack"
+run = "docker compose down"

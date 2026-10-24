@@ -1,0 +1,114 @@
+name: ci-cd
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test-python:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [ml-api, estimator-api]
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          working-directory: ${{ matrix.service }}
+      - run: uv sync --frozen
+      - if: matrix.service == 'ml-api'
+        run: uv run python -m app.ml.train
+      - run: uv run pytest -q
+
+  test-java:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: market-api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          build-root-directory: market-api
+      - run: ./gradlew test
+
+  test-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "26"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run build
+
+  build:
+    needs: [test-python, test-java, test-web]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04-arm # native arm64, no QEMU
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [ml-api, estimator-api, market-api, web]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.service }}
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ghcr.io/ekhrapykin/hpp-${{ matrix.service }}:latest
+            ghcr.io/ekhrapykin/hpp-${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: [self-hosted, pi]
+    env:
+      TAG: ${{ github.sha }} # deploy exactly the images built in this run; roll back with TAG=<older sha>
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker compose pull
+      - run: docker compose up -d --no-build --remove-orphans
+      - name: Wait for healthy
+        run: |
+          for _ in $(seq 1 30); do
+            if ! docker compose ps --format '{{.Health}}' | grep -qv '^healthy$'; then
+              docker compose ps
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose ps
+          exit 1
+      - run: docker image prune -f
