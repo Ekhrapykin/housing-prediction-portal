@@ -1,6 +1,6 @@
 # market-api
 
-Backend of the Market Explorer app. It seeds the 50-row housing dataset from `DATA_PATH` (the repo's `data/house_prices.csv`) into a database at startup (H2 in-memory locally, Postgres schema `market` in Docker) and serves filtered aggregates (summary, segment averages), a sortable/paged property list, CSV and PDF exports, and a what-if endpoint that asks `ml-api` for a price curve. The portal calls it through the Next.js rewrite `/api/market/*` (and directly from server components).
+Backend of the Market Explorer app. On every start it syncs the 50-row housing dataset from `DATA_PATH` (the repo's `data/house_prices.csv`, the source of truth) into its database (H2 in-memory locally, Postgres schema `market` in Docker) and serves filtered aggregates (summary, segment averages), a sortable/paged property list, CSV and PDF exports, and a what-if endpoint that asks `ml-api` for a price curve. The portal calls it through the Next.js rewrite `/api/market/*` (and directly from server components).
 
 System context: [../README.md](../README.md). Internals: [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -39,7 +39,7 @@ docker build -t hpp-market-api market-api
 docker run --rm -p 8080:8080 -e ML_API_URL=http://host.docker.internal:8000 -v "$PWD/data:/data:ro" -e DATA_PATH=/data/house_prices.csv hpp-market-api
 ```
 
-That runs on H2 like local dev. In compose the `docker` profile is active (`SPRING_PROFILES_ACTIVE=docker`), the CSV is bind-mounted read-only at `/data`, and the datasource is Postgres (`DATABASE_URL`, `MARKET_DB_PASSWORD`; user `market`, schema `market`). Hibernate creates the table (`ddl-auto: create`, no migrations) and the seeder reloads it on every start.
+That runs on H2 like local dev. In compose the `docker` profile is active (`SPRING_PROFILES_ACTIVE=docker`), the CSV is bind-mounted read-only at `/data`, and the datasource is Postgres (`DATABASE_URL`, `MARKET_DB_PASSWORD`; user `market`, schema `market`). Hibernate creates the table (`ddl-auto: create`, no migrations) and `CsvPropertySync` reloads it from the CSV on every start.
 
 Multi-stage build: JDK image runs `./gradlew bootJar`, the runtime is `eclipse-temurin:21-jre` as a non-root user with `JAVA_TOOL_OPTIONS=-Xmx256m -XX:+UseSerialGC`. Compose healthcheck: `curl -fsS http://localhost:8080/actuator/health` (40 s start period).
 
@@ -48,7 +48,8 @@ Multi-stage build: JDK image runs `./gradlew bootJar`, the runtime is `eclipse-t
 | Setting | Env var | Default | Purpose |
 |---|---|---|---|
 | `ml.api.url` | `ML_API_URL` | `http://localhost:8000` | ml-api base URL (blank falls back to the default) |
-| `data.path` | `DATA_PATH` | `../data/house_prices.csv` | Seed CSV (`/data/house_prices.csv` in Docker); UTF-8 BOM handled |
+| `data.path` | `DATA_PATH` | `../data/house_prices.csv` | Dataset CSV (`/data/house_prices.csv` in Docker); UTF-8 BOM handled |
+| `market.sync-on-startup` | `MARKET_SYNC_ON_STARTUP` | `true` | Reload the market table from the CSV on start; turn off once migrations own the data |
 | `spring.datasource.*` | `DATABASE_URL`, `MARKET_DB_PASSWORD` | H2 in-memory | `docker` profile only (`application-docker.yml`) |
 | `server.port` | | `8080` | |
 | `ml.api.connect-timeout` | | `2s` | ml-api connect timeout (`MlProperties`) |
@@ -110,7 +111,8 @@ market-api/
     │   ├── client/        # MlClient
     │   ├── domain/        # Property (JPA entity)
     │   ├── dto/           # records: HouseFeatures, MarketFilter, WhatIfRequest, ...
-    │   ├── config/        # AppConfig, MlProperties, DataSeeder
+    │   ├── config/        # AppConfig, MlProperties
+    │   ├── ingest/        # CsvPropertySync (CSV → market table on start)
     │   └── exception/     # ApiException hierarchy, ApiExceptionHandler
     ├── main/resources/    # application.yml, application-docker.yml
     └── test/java/...      # see Tests

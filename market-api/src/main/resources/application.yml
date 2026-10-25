@@ -4,6 +4,7 @@ ml.api:
   connect-timeout: 2s
   read-timeout: 5s
 data.path: ${DATA_PATH:../data/house_prices.csv} # DATA_PATH=/data/house_prices.csv in Docker
+market.sync-on-startup: ${MARKET_SYNC_ON_STARTUP:true} # reload the market table from data.path on every start
 spring:
   application.name: market-api
   jackson.property-naming-strategy: SNAKE_CASE

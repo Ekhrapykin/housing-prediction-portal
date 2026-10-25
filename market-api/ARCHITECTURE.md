@@ -21,7 +21,8 @@ flowchart LR
 | Client | `client` | `MlClient`: the only code that calls ml-api; maps failures to `ApiException`s. |
 | Domain | `domain` | `Property` entity. Never leaves the service layer; the controller returns `PropertyDto`. |
 | DTO | `dto` | Java records: `MarketFilter`, `WhatIfRequest`, `HouseFeatures`, responses. Records give `equals`/`hashCode` for free, which makes them cache keys. |
-| Config | `config` | `AppConfig` (caching, RestClient), `MlProperties`, `DataSeeder`. |
+| Config | `config` | `AppConfig` (caching, RestClient), `MlProperties`. |
+| Ingest | `ingest` | `CsvPropertySync`: reloads the market table from the dataset file on start. |
 | Exception | `exception` | `ApiException` subclasses carry an HTTP status; `ApiExceptionHandler` renders them. |
 
 ## Request flow: `POST /what-if`
@@ -68,9 +69,11 @@ Validation failures are 400 here and 422 in the Python services; the portal trea
 
 ## Data and persistence
 
-- `DataSeeder` (an `ApplicationRunner`) reads the file at `data.path` (`DATA_PATH`; default `../data/house_prices.csv`, `/data/house_prices.csv` in Docker, where the repo's `data/` is bind-mounted read-only), strips the UTF-8 BOM and saves 50 `Property` rows. The same file feeds ml-api training; there is one copy in the repo.
+- `CsvPropertySync` (an `ApplicationRunner`) reads the file at `data.path` (`DATA_PATH`; default `../data/house_prices.csv`, `/data/house_prices.csv` in Docker, where the repo's `data/` is bind-mounted read-only), strips the UTF-8 BOM and saves 50 `Property` rows. The same file feeds ml-api training; there is one copy in the repo.
 - Default config is H2 in-memory (`jdbc:h2:mem:market`, `create-drop`), so `bootRun` and the tests need no database. The `docker` profile (`application-docker.yml`) points at the shared Postgres as role `market` with `hibernate.default_schema=market`, and uses `ddl-auto: create`: Hibernate drops and recreates the table at startup, with no migrations.
-- Reseeding is idempotent: the seeder runs `deleteAllInBatch()` before inserting, so a restart never duplicates rows (and rows removed from the CSV disappear). Nothing survives a restart on purpose: it is reference data nobody writes.
+- **It is a sync, not a one-off seed.** The CSV is the source of truth and ml-api trains from the same file, so the `market` table is a read model derived from it. Reloading on every start keeps the dashboard and the model on the same data after the file changes (new data = restart, no migration), and it is what fills the in-memory H2 in dev and tests. The reload is a full replace (`deleteAllInBatch()` then `saveAll`), so it is idempotent: a restart never duplicates rows, and rows removed from the CSV disappear. It costs milliseconds for 50 rows.
+- Alternatives considered: a Postgres init script (`COPY ... FROM`) runs only when the volume is first created, so CSV updates would never arrive, and H2 would still need its own loader; a Flyway seed migration is the right tool once data is owned by migrations, but every CSV change would need a new migration; a one-shot `market-seed` container adds an image and startup ordering for 50 rows.
+- `market.sync-on-startup` (`MARKET_SYNC_ON_STARTUP`, default `true`) turns the sync off without a code change, for when Flyway takes over (see the root future improvements).
 - `open-in-view` is off; services open their own transactions through the repository.
 - Filtering is a JPA `Specification` (`Specification.allOf` over the non-null filters), shared by summary, segments, paging and exports. Sort keys are checked against a whitelist (`SORTABLE`) and snake_case is converted to the entity's camelCase.
 - Aggregates (summary, segments) are computed in Java over the filtered list (`ponytail` note in `MarketService`); with 50 rows that is simpler than JPQL aggregates.
@@ -101,7 +104,7 @@ Value-based record keys mean two requests with the same parameters hit the same 
 |---|---|
 | Java 21 | An LTS inside Boot 3.4's supported range (up to Java 24) that also runs on Gradle 8; JDK 25 would need Gradle 9. 21 avoids that toolchain upgrade. |
 | Gradle Kotlin DSL + version catalog | Typed build script; versions of non-BOM libraries in one file. Configuration cache and build cache are on in `gradle.properties`. |
-| H2 locally, Postgres in Docker; both seeded from the mounted CSV | The same JPA code runs on both. H2 keeps `bootRun` and the tests dependency-free; Postgres matches the deployment. `create` plus a reseed is enough for 50 reference rows. |
+| H2 locally, Postgres in Docker; both synced from the mounted CSV on start | The same JPA code runs on both. H2 keeps `bootRun` and the tests dependency-free; Postgres matches the deployment. `create` plus a reseed is enough for 50 reference rows. |
 | JPA Specifications | One composable filter definition for four endpoints, no string-built queries. |
 | Records as cache keys | Immutable, value-based `equals`/`hashCode`. |
 | RestClient forced to HTTP/1.1 | Avoids the h2c upgrade uvicorn rejects. |
