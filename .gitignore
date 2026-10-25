@@ -16,3 +16,4 @@ plan/
 market-api/build/
 market-api/.gradle/
 market-api/bin/
+.env

@@ -1,5 +1,6 @@
 import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 import joblib
 import numpy as np
@@ -7,17 +8,16 @@ import pandas as pd
 from sklearn.linear_model import RidgeCV
 from sklearn.metrics import mean_absolute_error, r2_score, root_mean_squared_error
 from sklearn.model_selection import KFold, cross_validate
-from sklearn.pipeline import make_pipeline
+from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from app.config import get_settings
 from app.ml.features import FEATURES, TARGET
 
 
-def main() -> None:
-    settings = get_settings()
-    artifacts = settings.artifacts_dir
-    df = pd.read_csv(settings.data_path, encoding="utf-8-sig")
+def train(data_path: Path) -> tuple[Pipeline, dict]:
+    """Fit the model on the CSV; returns the pipeline and its model card. Deterministic (fixed CV seed)."""
+    df = pd.read_csv(data_path, encoding="utf-8-sig")
     X, y = df[FEATURES], df[TARGET]
 
     pipe = make_pipeline(StandardScaler(), RidgeCV(alphas=np.logspace(-3, 3, 25)))
@@ -60,6 +60,14 @@ def main() -> None:
         "trained_at": datetime.now(UTC).isoformat(),
     }
 
+    return pipe, info
+
+
+def main() -> None:
+    """CLI for local use: train and write the artifacts."""
+    settings = get_settings()
+    artifacts = settings.artifacts_dir
+    pipe, info = train(settings.data_path)
     artifacts.mkdir(exist_ok=True)
     joblib.dump(pipe, artifacts / "model.joblib")
     (artifacts / "model_info.json").write_text(json.dumps(info, indent=2))

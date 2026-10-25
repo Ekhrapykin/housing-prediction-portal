@@ -1,34 +1,44 @@
-import sqlite3
-from contextlib import closing
-from typing import Annotated
+from collections.abc import Iterator
 
-from fastapi import Depends
-
-from app.config import Settings, get_settings
-
-SCHEMA = """
-    CREATE TABLE IF NOT EXISTS estimates (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        label TEXT,
-        features TEXT NOT NULL,
-        price REAL NOT NULL,
-        warnings TEXT NOT NULL,
-        created_at TEXT NOT NULL
-    )"""
+from fastapi import Request
+from sqlalchemy import JSON, Engine, create_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 
-def init_db(path: str) -> None:
-    with closing(sqlite3.connect(path)) as conn, conn:
-        conn.execute(SCHEMA)
+class Base(DeclarativeBase):
+    pass
 
 
-def get_db(settings: Annotated[Settings, Depends(get_settings)]):
-    # check_same_thread=False: FastAPI may run a sync dependency and the sync handler on different
-    # threadpool threads. Safe here because the connection is never shared between requests.
-    conn = sqlite3.connect(settings.db_path, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-        conn.commit()
-    finally:
-        conn.close()
+class EstimateRow(Base):
+    # No schema here: on Postgres the role's search_path (set in postgres/init) puts the table in `estimator`.
+    __tablename__ = "estimates"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    label: Mapped[str | None]
+    features: Mapped[dict] = mapped_column(JSON)
+    price: Mapped[float]
+    warnings: Mapped[list[str]] = mapped_column(JSON)
+    created_at: Mapped[str]  # ISO-8601 UTC
+
+
+def make_engine(url: str) -> Engine:
+    return create_engine(url, pool_pre_ping=True)
+
+
+def init_db(engine: Engine) -> None:
+    Base.metadata.create_all(engine)
+
+
+def get_session(request: Request) -> Iterator[Session]:
+    """Request-scoped session: commit on success, roll back on error, always close."""
+    with request.app.state.session_factory() as session:
+        try:
+            yield session
+            session.commit()
+        except BaseException:
+            session.rollback()
+            raise
+
+
+def make_session_factory(engine: Engine) -> sessionmaker[Session]:
+    return sessionmaker(engine, expire_on_commit=False)

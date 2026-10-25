@@ -32,7 +32,7 @@ def fake_ml():
 
 @pytest.fixture
 def client(tmp_path, monkeypatch, fake_ml):
-    monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'test.db'}")
     get_settings.cache_clear()
     app = create_app()
     app.dependency_overrides[get_ml_client] = lambda: fake_ml

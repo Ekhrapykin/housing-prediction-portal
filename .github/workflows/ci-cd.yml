@@ -26,8 +26,6 @@ jobs:
         with:
           working-directory: ${{ matrix.service }}
       - run: uv sync --frozen
-      - if: matrix.service == 'ml-api'
-        run: uv run python -m app.ml.train
       - run: uv run pytest -q
 
   test-java:

@@ -4,12 +4,14 @@ from fastapi import FastAPI
 
 from app.api import health, model_info, predictions
 from app.config import get_settings
+from app.ml.train import train
 from app.services.predictor import Predictor
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.predictor = Predictor.load(get_settings().artifacts_dir)
+    # Trains in memory at startup (about a second on 50 rows); a missing CSV fails startup loudly.
+    app.state.predictor = Predictor(*train(get_settings().data_path))
     yield
 
 

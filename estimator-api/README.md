@@ -1,6 +1,6 @@
 # estimator-api
 
-Backend of the Price Estimator app. It accepts house features, asks `ml-api` for a price, stores the result (features, price, warnings, timestamp) in SQLite and serves the history back. It also proxies `ml-api`'s model card and reports `ml-api` reachability in its health check. The portal calls it through the Next.js rewrite `/api/estimator/*`.
+Backend of the Price Estimator app. It accepts house features, asks `ml-api` for a price, stores the result (features, price, warnings, timestamp) in a SQL database (SQLite locally, PostgreSQL in Docker) and serves the history back. It also proxies `ml-api`'s model card and reports `ml-api` reachability in its health check. The portal calls it through the Next.js rewrite `/api/estimator/*`.
 
 System context: [../README.md](../README.md). Internals: [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -12,7 +12,7 @@ System context: [../README.md](../README.md). Internals: [ARCHITECTURE.md](ARCHI
 | Packaging | uv, `uv.lock` committed |
 | API | FastAPI >=0.162, uvicorn[standard] >=0.54, pydantic-settings >=2.16 |
 | HTTP client | httpx >=0.28 (sync `httpx.Client`, pooled) |
-| Storage | stdlib `sqlite3` (no ORM) |
+| Storage | SQLAlchemy 2.0 (typed ORM), `psycopg` 3 for Postgres; SQLite by default |
 | Tests | pytest >=9.1, `httpx2` (TestClient) |
 
 ## Run locally
@@ -30,16 +30,16 @@ uv sync
 uv run uvicorn app.main:app --port 8001
 ```
 
-Swagger UI: http://localhost:8001/docs. The default DB file is `estimates.db` in the working directory (git-ignored).
+Swagger UI: http://localhost:8001/docs. The default `DATABASE_URL` is `sqlite:///estimates.db`, a file in the working directory (git-ignored).
 
 ## Run in Docker
 
 ```bash
 docker build -t hpp-estimator-api estimator-api
-docker run --rm -p 8001:8001 -e ML_API_URL=http://host.docker.internal:8000 -v estimates:/data -e DB_PATH=/data/estimates.db hpp-estimator-api
+docker run --rm -p 8001:8001 -e ML_API_URL=http://host.docker.internal:8000 hpp-estimator-api   # SQLite inside the container (lost on exit)
 ```
 
-In `docker-compose.yml` it gets `ML_API_URL=http://ml-api:8000`, `DB_PATH=/data/estimates.db` on the `estimator-data` named volume, waits for `ml-api` to be healthy, and is published on `8001` for Swagger demos.
+In `docker-compose.yml` it gets `ML_API_URL=http://ml-api:8000` and `DATABASE_URL=postgresql+psycopg://estimator:...@postgres:5432/housing` (data lives in the `postgres-data` volume), waits for `ml-api` and `postgres` to be healthy, and is published on `8001` for Swagger demos.
 
 ## Configuration
 
@@ -49,7 +49,7 @@ Read by `app/config.py` (env var = upper-cased field name).
 |---|---|---|
 | `ML_API_URL` | `http://localhost:8000` | Base URL of ml-api |
 | `ML_API_TIMEOUT` | `5.0` | Seconds, for the pooled httpx client |
-| `DB_PATH` | `estimates.db` | SQLite file; the table is created at startup |
+| `DATABASE_URL` | `sqlite:///estimates.db` | SQLAlchemy URL; the table is created at startup (`create_all`). In Docker the `estimator` role's `search_path` puts it in schema `estimator` |
 
 ## Endpoints
 
@@ -70,8 +70,8 @@ All errors have the shape `{"detail": ...}`. `detail` is a string for service er
 cd estimator-api && uv sync && uv run pytest -q    # 6 passed
 ```
 
-- `tests/test_estimates_api.py` runs the real app against a temp SQLite file with a fake ML client injected through `app.dependency_overrides`. It covers create plus list, list by ids in requested order, malformed ids (422), unknown id (404), ml-api down (503), and invalid input (422 without calling ml-api).
-- `tests/test_estimate_service.py` exercises `EstimateService` with an in-memory SQLite and the fake client, with no FastAPI at all.
+- `tests/test_estimates_api.py` runs the real app against a temp-file SQLite database with a fake ML client injected through `app.dependency_overrides`. It covers create plus list, list by ids in requested order, malformed ids (422), unknown id (404), ml-api down (503), and invalid input (422 without calling ml-api).
+- `tests/test_estimate_service.py` exercises `EstimateService` with a temp-file SQLite database and the fake client, with no FastAPI at all.
 - Not covered: the real `MlClient` against HTTP (status mapping is untested), `limit` bounds, DELETE 204.
 
 ## Layout
@@ -79,15 +79,15 @@ cd estimator-api && uv sync && uv run pytest -q    # 6 passed
 ```
 estimator-api/
 ├── app/
-│   ├── main.py            # create_app(), lifespan: init_db + pooled httpx.Client
+│   ├── main.py            # create_app(), lifespan: engine + init_db + pooled httpx.Client
 │   ├── config.py          # Settings
-│   ├── db.py              # SCHEMA, init_db, get_db (per-request connection)
-│   ├── deps.py            # get_ml_client, get_estimate_service, *Dep aliases
+│   ├── db.py              # ORM model (EstimateRow), engine and sessionmaker, init_db, get_session (request-scoped Session)
+│   ├── deps.py            # get_ml_client, get_estimate_service (builds the repo on the Session), *Dep aliases
 │   ├── errors.py          # AppError hierarchy + {detail} handler
 │   ├── schemas.py         # HouseFeatures, EstimateRequest, Estimate
 │   ├── api/               # estimates.py, health.py (routers)
 │   ├── services/estimates.py      # EstimateService (orchestration)
-│   ├── repositories/estimates.py  # EstimateRepository (SQL)
+│   ├── repositories/estimates.py  # EstimateRepository (SQLAlchemy queries on a Session)
 │   └── clients/ml.py      # MlClient (httpx, error translation)
 ├── tests/                 # conftest.py (FakeMlClient), API and service tests
 ├── Dockerfile

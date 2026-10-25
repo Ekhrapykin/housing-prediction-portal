@@ -1,46 +1,45 @@
-import json
-import sqlite3
 from datetime import UTC, datetime
 
+from sqlalchemy import delete, select
+from sqlalchemy.orm import Session
+
+from app.db import EstimateRow
 from app.schemas import Estimate
 
 
-def _to_estimate(row: sqlite3.Row) -> Estimate:
+def _to_estimate(row: EstimateRow) -> Estimate:
     return Estimate(
-        id=row["id"], label=row["label"], features=json.loads(row["features"]),
-        price=row["price"], warnings=json.loads(row["warnings"]), created_at=row["created_at"],
+        id=row.id, label=row.label, features=row.features,
+        price=row.price, warnings=row.warnings, created_at=row.created_at,
     )
 
 
 class EstimateRepository:
-    def __init__(self, conn: sqlite3.Connection):
-        self._conn = conn
+    def __init__(self, session: Session):
+        self._session = session
 
     def add(self, label: str | None, features: dict, price: float, warnings: list[str]) -> Estimate:
-        now = datetime.now(UTC).isoformat()
-        cur = self._conn.execute(
-            "INSERT INTO estimates (label, features, price, warnings, created_at) VALUES (?, ?, ?, ?, ?)",
-            (label, json.dumps(features), price, json.dumps(warnings), now),
-        )
-        return Estimate(id=cur.lastrowid, label=label, features=features,
-                        price=price, warnings=warnings, created_at=now)
+        row = EstimateRow(label=label, features=features, price=price, warnings=warnings,
+                          created_at=datetime.now(UTC).isoformat())
+        self._session.add(row)
+        self._session.flush()  # assigns the id; the commit happens in the session dependency
+        return _to_estimate(row)
 
     def get(self, estimate_id: int) -> Estimate | None:
-        row = self._conn.execute("SELECT * FROM estimates WHERE id = ?", (estimate_id,)).fetchone()
+        row = self._session.get(EstimateRow, estimate_id)
         return _to_estimate(row) if row else None
 
     def list_recent(self, limit: int) -> list[Estimate]:
-        rows = self._conn.execute("SELECT * FROM estimates ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        rows = self._session.scalars(select(EstimateRow).order_by(EstimateRow.id.desc()).limit(limit))
         return [_to_estimate(r) for r in rows]
 
     def list_by_ids(self, ids: list[int]) -> list[Estimate]:
         """In the requested order (the comparison view's column order); unknown ids are skipped."""
         if not ids:
             return []
-        marks = ",".join("?" * len(ids))
-        rows = self._conn.execute(f"SELECT * FROM estimates WHERE id IN ({marks})", ids).fetchall()
-        by_id = {r["id"]: _to_estimate(r) for r in rows}
+        rows = self._session.scalars(select(EstimateRow).where(EstimateRow.id.in_(ids)))
+        by_id = {r.id: _to_estimate(r) for r in rows}
         return [by_id[i] for i in dict.fromkeys(ids) if i in by_id]
 
     def delete(self, estimate_id: int) -> bool:
-        return self._conn.execute("DELETE FROM estimates WHERE id = ?", (estimate_id,)).rowcount > 0
+        return self._session.execute(delete(EstimateRow).where(EstimateRow.id == estimate_id)).rowcount > 0

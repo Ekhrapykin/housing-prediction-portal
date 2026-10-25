@@ -12,16 +12,16 @@ flowchart TB
     E[estimator-api<br/>FastAPI :8001]
     M[market-api<br/>Spring Boot :8080]
     ML[ml-api<br/>FastAPI + scikit-learn :8000]
-    DB[(SQLite file<br/>estimator-data volume)]
-    H2[(H2 in-memory<br/>seeded from CSV)]
-    A[(model artifacts<br/>baked into image)]
+    PG[(PostgreSQL 17<br/>db housing, postgres-data volume<br/>schema estimator, schema market)]
+    CSV[(data/house_prices.csv<br/>bind mount, read-only)]
     W -->|/api/estimator rewrite + RSC fetch| E
     W -->|/api/market rewrite + RSC fetch| M
     E -->|POST /predict, GET /model-info| ML
     M -->|POST /predict/batch| ML
-    E --- DB
-    M --- H2
-    ML --- A
+    E -->|role estimator| PG
+    M -->|role market| PG
+    CSV -.->|trains at startup| ML
+    CSV -.->|seeds at startup| M
   end
   GH[GitHub Actions] -->|arm64 images| GHCR[(GHCR)]
   GHCR -->|docker compose pull| Host
@@ -31,16 +31,17 @@ flowchart TB
 
 | Service | Owns | Calls | Called by |
 |---|---|---|---|
-| ml-api | The trained model and its card (`/model-info`) | nobody | estimator-api, market-api |
-| estimator-api | Estimate history (SQLite) | ml-api | web |
-| market-api | Market dataset view (H2), aggregates, exports, what-if | ml-api | web |
+| ml-api | The model, trained at startup, and its card (`/model-info`) | nobody | estimator-api, market-api |
+| estimator-api | Estimate history (Postgres schema `estimator`) | ml-api | web |
+| market-api | Market dataset view (Postgres schema `market`, H2 locally), aggregates, exports, what-if | ml-api | web |
 | web | UI, URL state, browser cache | estimator-api, market-api | browser |
+| postgres | One database `housing`, schemas `estimator` and `market`, one role each | nobody | estimator-api, market-api |
 
 Rules:
 
 - The browser never talks to a backend directly. It calls `/api/*` on the portal's own origin, and the portal proxies.
 - Only the two app backends call ml-api; the portal reaches the model card through `estimator-api /model-info`.
-- No service reads another's storage. The 50-row dataset is copied into `ml-api/data` (training) and `market-api/src/main/resources/data` (seed); it is read-only reference data.
+- No service reads another's storage. Each backend has its own Postgres role that can only touch its own schema, and there are no cross-schema joins. The 50-row dataset is one file, `data/house_prices.csv`, mounted read-only into ml-api (training) and market-api (seed); it is reference data nobody writes.
 
 ## Cross-cutting contracts
 
@@ -48,7 +49,7 @@ Rules:
 |---|---|
 | JSON naming | snake_case everywhere. Python models use snake_case fields; market-api sets `spring.jackson.property-naming-strategy: SNAKE_CASE` and binds snake_case query params with `@BindParam`. |
 | Errors | Non-2xx responses carry `{"detail": ...}`. estimator-api uses an `AppError` handler; market-api returns `ProblemDetail` (which has `detail`); ml-api uses FastAPI defaults. `detail` is a string, except FastAPI validation 422s, where it is a list of issues; the portal's `apiFetch` turns that list into a readable `field: message` string. Validation status differs: 422 in Python, 400 in Java. |
-| Health | ml-api and estimator-api `GET /health`, market-api `GET /actuator/health`, web `GET /`. Compose healthchecks and `depends_on: service_healthy` order startup: ml-api, then the two app backends, then web. |
+| Health | ml-api and estimator-api `GET /health`, market-api `GET /actuator/health`, web `GET /`, postgres `pg_isready`. Compose healthchecks and `depends_on: service_healthy` order startup: postgres and ml-api, then the two app backends, then web. |
 | Feature schema | The 7 features with identical bounds are defined in four places (below). |
 
 ### The 7-feature schema, mirrored four times
@@ -70,7 +71,7 @@ sequenceDiagram
   participant W as web (Next)
   participant E as estimator-api
   participant ML as ml-api
-  participant DB as SQLite
+  participant DB as Postgres (schema estimator)
   B->>B: zod validation (react-hook-form)
   B->>W: POST /api/estimator/estimates
   W->>E: rewrite to POST /estimates
@@ -115,9 +116,9 @@ sequenceDiagram
 | web, Next fetch cache | Server-side market reads | `revalidate: 300`, tag `market` |
 | web, no cache | Server-side estimator reads | `cache: "no-store"` (user data) |
 | web, TanStack Query | Browser queries | `staleTime` 30 s (model info 10 min); mutations invalidate `["estimates"]` |
-| ml-api | none | Model in memory; predictions are cheap |
+| ml-api | none | Model in memory (trained at startup); predictions are cheap |
 
-The market data never changes at runtime, so time-based expiry is enough. Estimates are never cached on the server because every write must be visible on the next read.
+The market data never changes while the app runs, so time-based expiry is enough. Estimates are never cached on the server because every write must be visible on the next read.
 
 ## Deployment
 
@@ -130,8 +131,8 @@ flowchart LR
   D -->|TAG = SHA, compose pull and up| PI[Raspberry Pi<br/>docker compose]
 ```
 
-- **Compose:** one file for laptop (`up --build`) and Pi (`pull` + `up -d --no-build`). Images are named `ghcr.io/ekhrapykin/hpp-<service>:${TAG:-latest}`. Memory limits: ml-api 512m, estimator-api 256m, market-api 640m (JVM `-Xmx256m`, SerialGC), web 384m.
-- **Images:** ml-api trains inside `docker build`; market-api is a multi-stage JDK-to-JRE build; web is a multi-stage Next `standalone` build with backend URLs as build args. All four images run as a non-root user.
+- **Compose:** one file for laptop (`up --build`) and Pi (`pull` + `up -d --no-build`). Images are named `ghcr.io/ekhrapykin/hpp-<service>:${TAG:-latest}`. Memory limits: postgres 384m (`shared_buffers=64MB`, `max_connections=30`), ml-api 512m, estimator-api 256m, market-api 640m (JVM `-Xmx256m`, SerialGC), web 384m. `./data` and `./postgres/init` are bind-mounted from the checkout, which the deploy job has; Postgres data is the named volume `postgres-data`. Postgres has no published port. Passwords come from `.env` or demo defaults in compose (`.env.example`).
+- **Images:** ml-api and market-api images contain no data (the CSV is mounted) and ml-api no model (it trains at startup); market-api is a multi-stage JDK-to-JRE build; web is a multi-stage Next `standalone` build with backend URLs as build args. All four app images run as a non-root user; Postgres is the official `postgres:17-alpine` image.
 - **CI:** tests run on every push and PR. Images are built natively for arm64 on `ubuntu-24.04-arm` (no QEMU), with a GitHub Actions layer cache per service.
 - **CD:** the deploy job runs on the Pi's self-hosted runner with `TAG=${{ github.sha }}`, so it deploys exactly the images built in that run rather than whatever `latest` is. It waits up to 150 s for all containers to be healthy and fails the job otherwise. Rollback is `TAG=<older sha> docker compose up -d`.
 - **Exposure:** only port 3000 needs to be public (Tailscale Funnel or Cloudflare Tunnel). Backend ports are published for Swagger demos only.
@@ -141,9 +142,10 @@ flowchart LR
 | Area | Choice | Rationale |
 |---|---|---|
 | Model API | Python 3.14, FastAPI >=0.162, scikit-learn >=1.9 | The standard ML stack; Pydantic validation and OpenAPI for free |
-| Estimator backend | FastAPI + stdlib `sqlite3`, httpx | Same stack as ml-api; one table needs no ORM |
+| Estimator backend | FastAPI, SQLAlchemy 2.0 (typed ORM), psycopg 3, httpx | Same stack as ml-api; the ORM runs on SQLite (tests, local) and Postgres (Docker) unchanged |
 | Market backend | Java 21, Spring Boot 3.4.4, Gradle 8.14 (Kotlin DSL, version catalog) | Task asks for Java; Boot gives JPA, cache, validation, ProblemDetail, actuator |
-| Market storage | H2 in-memory, Hibernate, JPA Specifications | Read-only 50-row dataset; composable filters |
+| Market storage | Hibernate on Postgres in Docker, H2 locally and in tests, JPA Specifications | Read-only 50-row dataset; composable filters; one JPA codebase on both |
+| Database | PostgreSQL 17 (alpine), one instance, one DB, schema and role per service | A real database on the Pi without a container per service; `postgres:17` is a mature supported major with a stable volume path |
 | Market cache | Caffeine | In-process, no extra container |
 | Exports | OpenPDF 2.4.0, hand-written CSV | Small, permissive PDF library |
 | Portal | Next.js 16.4.3 App Router, React 19.3 | RSC for server-rendered market views, one origin for both apps |
@@ -156,9 +158,9 @@ flowchart LR
 
 **Three backends.** The task asks for a model API, a Python-backed app and a Java-backed app. Each backend owns one concern (model, estimates, market), and the model is a shared dependency behind HTTP instead of being loaded twice. Cost: more containers and duplicated contracts.
 
-**SQLite and H2 instead of a real database.** Estimates are a single table with low write volume; market data is read-only reference data rebuilt from CSV at startup. No database container to run on a Pi. Cost: one replica per service, no shared data, history lives in a volume.
+**One PostgreSQL with a schema and a role per service.** Both backends store data through an ORM, so one `postgres:17-alpine` container (about 64 MB shared buffers) serves them without a database per service. Database `housing` has schemas `estimator` and `market`. Each is owned by its own role, nobody else has grants on it, and `search_path` is set per role, so unqualified table names land in the right schema and one service cannot read the other's tables. The init script (`postgres/init/01-schemas.sh`) creates them on first start, tables come from the ORMs (`create_all`, Hibernate `ddl-auto: create`), and there is no Flyway or Alembic. Hibernate's `create` is safe because market data is reseeded from the CSV on every start; estimates are never dropped because SQLAlchemy only creates missing tables. Local runs and tests stay on SQLite (estimator) and in-memory H2 (market), so no database is needed to develop; the same ORM code runs on both. Cost: one more container and a single shared failure point (one instance, no replication), and the portability is only as good as the tests, which do not run against Postgres (see future improvements).
 
-**Training at build time.** The image is the model: reproducible, no volume, no init job, and CI tests the same training code. Cost: retraining means a rebuild, and there is no model registry.
+**Training at startup from a mounted CSV.** `data/house_prices.csv` exists once in the repo and is bind-mounted read-only into ml-api (training) and market-api (seed), instead of being copied into two images. ml-api trains in `lifespan` (about a second, deterministic because the CV split has a fixed seed), so changing the data needs a restart, not a rebuild, and CI tests the same code path the service runs. A bind mount, not a named volume, so the file comes from the checkout that the Pi deploy job already has. Cost: the image alone is not a model, startup is slightly slower (compose `start_period` is 30 s), and there is still no model registry.
 
 **Ridge over OLS or boosting.** With 50 rows and features correlated at 0.91-0.99, OLS coefficients are unstable, and boosting would overfit and lose the linear explanation the portal shows (contribution = coefficient x distance from mean). Ridge regularises and stays explainable. Cost: the alpha picked by `RidgeCV` is small, so coefficients are still unstable (see limitations).
 
@@ -168,8 +170,6 @@ flowchart LR
 
 **Java 21, not 25.** Spring Boot 3.4 supports Java up to 24 and Gradle up to 8.x; running on JDK 25 needs Gradle 9. Java 21 is an LTS that fits Boot 3.4.4 and Gradle 8.14 without a toolchain jump.
 
-**Next step: one shared Postgres instance.** Keep one database or schema per service with its own role: `estimator` (replaces SQLite), `market` if needed, and a shared read-only `housing` reference schema that replaces the two CSV copies. ml-api would train from `housing` in a one-shot `ml-train` job that writes the artifacts, instead of training during `docker build`. Sharing the instance is a hosting simplification, not shared ownership: only owners write, and there are no cross-schema joins in application code.
-
 ## Known limitations and next steps
 
 - **Model coefficients are unstable.** The features are highly collinear, so single-feature coefficients have implausible signs (currently `square_footage`, `bedrooms` and `year_built` negative). Predictions are accurate, but the what-if curve can slope down as square footage rises, and the per-feature breakdown inherits the same problem. A larger fixed alpha trades a little R2 for sensible signs.
@@ -178,3 +178,11 @@ flowchart LR
 - **No auth;** the estimate history is shared by everyone.
 - **No e2e tests,** and none of the portal's code is unit-tested.
 - **Single host, no TLS termination of its own;** relies on the tunnel.
+
+## Future improvements
+
+- **On-the-fly retraining.** `POST /admin/retrain` in ml-api reads the (new) CSV, validates it (columns, ranges, row count), trains, and swaps the in-memory model only if the CV metrics pass a threshold (for example R2 not below the current model's minus a tolerance). A `model_runs` table would log every attempt with metrics, data hash and outcome, which also gives the model versioning ml-api lacks today.
+- **Migrations.** Alembic for estimator-api and Flyway for market-api once a column has to change on live data; `create_all` and `ddl-auto: create` only handle the first creation.
+- **Testcontainers for Postgres.** Run the repository and JPA tests against a real Postgres, so SQLite/H2 portability is checked, including the per-role schemas.
+- **Authentication and per-user history.** The estimate history is shared by everyone. A user id column on `estimates`, with auth at the portal, makes the isolation per user and not just per service.
+- **Backups.** The `postgres-data` volume is the only copy of the estimates. A scheduled `pg_dump` of the `estimator` schema to the host or object storage would protect it from a bad SD card.

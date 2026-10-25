@@ -23,6 +23,7 @@ dependencies {
     implementation(libs.springdoc.ui)
     implementation(libs.openpdf)
     runtimeOnly("com.h2database:h2")
+    runtimeOnly("org.postgresql:postgresql")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

@@ -1,5 +1,6 @@
 server.port: 8080
 ml.api.url: ${ML_API_URL:http://localhost:8000}
+data.path: ${DATA_PATH:../data/house_prices.csv} # DATA_PATH=/data/house_prices.csv in Docker
 spring:
   application.name: market-api
   jackson.property-naming-strategy: SNAKE_CASE

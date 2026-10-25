@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 class Settings(BaseSettings):
     artifacts_dir: Path = ROOT / "artifacts"
-    data_path: Path = ROOT / "data" / "house_prices.csv"
+    data_path: Path = ROOT.parent / "data" / "house_prices.csv"  # DATA_PATH=/data/house_prices.csv in Docker
 
 
 @lru_cache

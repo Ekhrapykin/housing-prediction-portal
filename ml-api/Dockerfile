@@ -6,11 +6,10 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 ENV PATH="/app/.venv/bin:$PATH"
 
-COPY data ./data
 COPY app ./app
-RUN python -m app.ml.train
 
-# Train as root at build time; serve as an unprivileged user (it only reads the artifacts).
+# The CSV is mounted at /data (see docker-compose.yml); the model trains at startup.
+ENV DATA_PATH=/data/house_prices.csv
 RUN useradd --system --uid 10001 app
 USER app
 

@@ -5,7 +5,7 @@
 ```mermaid
 flowchart LR
   R[api/ routes] --> S[services/]
-  S --> Repo[repositories/] --> DB[(SQLite)]
+  S --> Repo[repositories/] --> DB[(SQLite locally<br/>Postgres schema estimator in Docker)]
   S --> C[clients/ml.py] --> ML[ml-api]
   R -.uses.-> Sch[schemas.py]
   R -.Depends.-> D[deps.py]
@@ -15,11 +15,11 @@ flowchart LR
 |---|---|---|
 | Routes | `app/api/` | Declare path, status code and response model, delegate to a service. No SQL, no HTTP calls. |
 | Service | `app/services/estimates.py` | Use cases (`create`, `get`, `list`, `delete`). Raises domain errors. No FastAPI imports. |
-| Repository | `app/repositories/estimates.py` | The only place that writes SQL; maps rows to `Estimate`. Takes a connection. |
+| Repository | `app/repositories/estimates.py` | The only place that queries the database; maps `EstimateRow` to `Estimate`. Takes a SQLAlchemy `Session`. |
 | Client | `app/clients/ml.py` | The only place that talks to ml-api; turns HTTP failures into domain errors. |
 | Schemas | `app/schemas.py` | Request and response models. |
 | Errors | `app/errors.py` | `AppError` hierarchy and one handler. |
-| Config / deps | `config.py`, `deps.py`, `db.py` | Settings, wiring. `deps.py` is the composition root: it builds a service per request. |
+| Config / deps / db | `config.py`, `deps.py`, `db.py` | Settings, wiring, the ORM model and the `Session` dependency. `deps.py` is the composition root: it builds a service per request. |
 
 Because the service takes plain collaborators, `test_estimate_service.py` runs it without FastAPI.
 
@@ -32,7 +32,7 @@ sequenceDiagram
   participant S as EstimateService
   participant C as MlClient (pooled)
   participant ML as ml-api
-  participant DB as SQLite
+  participant DB as SQLite / Postgres
   W->>R: POST /estimates {features, label}
   R->>R: validate EstimateRequest (422 on failure)
   R->>S: create(req)
@@ -42,7 +42,7 @@ sequenceDiagram
   S->>DB: INSERT estimates
   S-->>R: Estimate
   R-->>W: 201 Estimate
-  Note over R,DB: get_db commits after the handler, closes the connection
+  Note over R,DB: get_session commits after the handler, rolls back on error, always closes
 ```
 
 The validated request is checked here and again by ml-api. A 422 from ml-api is passed through as a 422 rather than a 500.
@@ -63,11 +63,13 @@ Every failure is rendered as `{"detail": ...}`, the same contract the other serv
 
 ## Data and persistence
 
-SQLite, stdlib `sqlite3`, one table:
+SQLAlchemy 2.0 with the typed declarative style (`DeclarativeBase`, `Mapped[...]`, `mapped_column`), one table, `EstimateRow` in `db.py`:
 
-`estimates(id INTEGER PK AUTOINCREMENT, label TEXT, features TEXT, price REAL, warnings TEXT, created_at TEXT)`
+`estimates(id INTEGER PK, label TEXT NULL, features JSON, price FLOAT, warnings JSON, created_at TEXT)`
 
-`features` and `warnings` are JSON text; `created_at` is an ISO-8601 UTC string. The table is created with `CREATE TABLE IF NOT EXISTS` in `lifespan`, so there are no migrations. Each request opens its own connection in `get_db` (`check_same_thread=False` because FastAPI may run the dependency and the sync handler on different threadpool threads), commits after the handler, and closes it. In Docker the file lives on the `estimator-data` volume.
+`features` and `warnings` use the generic `JSON` type (JSON text on SQLite, `json` on Postgres); `created_at` is an ISO-8601 UTC string. `lifespan` builds the `Engine` from `DATABASE_URL` and a `sessionmaker`, keeps the factory on `app.state`, and runs `Base.metadata.create_all`, so there are no migrations. `get_session` is the request-scoped `Session` dependency: commit after the handler succeeds, roll back on any exception, always close. The repository only calls `add`/`flush`/`select`/`delete` on that session.
+
+**Which schema.** The model has no `schema=`. `DATABASE_URL` selects the backend: SQLite for local runs and tests, Postgres in compose. On Postgres the `estimator` role is created with `ALTER ROLE estimator SET search_path = estimator` (`postgres/init/01-schemas.sh`), so `create_all` and every query resolve to `estimator.estimates`, and the role has no grants on `market`. SQLite has no schemas, so the same code works unchanged.
 
 ## ml-api connection pool
 
@@ -75,16 +77,16 @@ SQLite, stdlib `sqlite3`, one table:
 
 ## Testing seams
 
-`conftest.py` overrides `get_ml_client` with `FakeMlClient` through `app.dependency_overrides` and points `DB_PATH` at a temp file (clearing the `lru_cache` on `get_settings`). The real stack runs in tests except the network call.
+`conftest.py` overrides `get_ml_client` with `FakeMlClient` through `app.dependency_overrides` and points `DATABASE_URL` at a temp-file SQLite database (clearing the `lru_cache` on `get_settings`). The real stack runs in tests except the network call.
 
 ## Key decisions
 
 | Decision | Why |
 |---|---|
 | Service owns ml-api calls, not the portal | Keeps the model private, persists every estimate with its warnings, one place for error mapping. |
-| Raw `sqlite3`, no ORM | One table and five queries; an ORM would be more code than the problem. |
+| SQLAlchemy 2.0 ORM, not raw SQL | One codebase runs on SQLite (tests, local) and Postgres (Docker) with no SQL dialect code; the typed model is the schema. Cost: a dependency for one table. |
 | JSON text columns | Features are always read and written as a unit; no querying inside them. |
-| Connection per request | Avoids sharing a connection across threads. |
+| Session per request, commit in the dependency | One transaction per request; a failed handler rolls back. Sessions are never shared across threads. |
 | Feature schema duplicated from ml-api | `ponytail` note in `schemas.py`: extract a shared package if a third consumer appears. Fails fast without a round-trip. |
 | Domain error hierarchy | Services and clients stay HTTP-agnostic; one handler owns the wire format. |
 | `/health` always 200 with `ml_api: up/down` | The service is alive even when its dependency is not; compose healthchecks stay stable. |
@@ -93,5 +95,5 @@ SQLite, stdlib `sqlite3`, one table:
 
 - No authentication or per-user scoping: all clients share one history, and the portal never caches it (see the root [ARCHITECTURE.md](../ARCHITECTURE.md)).
 - 422 `detail` is a list for validation errors but a string elsewhere; clients must handle both.
-- Single SQLite file means a single replica. A shared Postgres with one schema per service is the next step (root [ARCHITECTURE.md](../ARCHITECTURE.md)).
+- `create_all` only creates missing tables; changing a column needs a migration tool (Alembic is listed under future improvements in the root [ARCHITECTURE.md](../ARCHITECTURE.md)).
 - The prediction inherits ml-api's collinearity caveat ([../ml-api/ARCHITECTURE.md](../ml-api/ARCHITECTURE.md)).

@@ -1,7 +1,3 @@
-import json
-from pathlib import Path
-
-import joblib
 import pandas as pd
 
 from app.ml.features import FEATURES
@@ -13,13 +9,6 @@ class Predictor:
         self._model = model
         self.info = info
         self._stats = info["feature_stats"]
-
-    @classmethod
-    def load(cls, artifacts_dir: Path) -> "Predictor":
-        return cls(
-            joblib.load(artifacts_dir / "model.joblib"),
-            json.loads((artifacts_dir / "model_info.json").read_text()),
-        )
 
     def predict(self, houses: list[HouseFeatures]) -> list[Prediction]:
         df = pd.DataFrame([h.model_dump() for h in houses])[FEATURES]

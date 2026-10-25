@@ -5,7 +5,7 @@
 ```mermaid
 flowchart LR
   W[web/MarketController] --> S[service/]
-  S --> R[repository/ + Specifications] --> H[(H2 in-memory)]
+  S --> R[repository/ + Specifications] --> H[(H2 locally / Postgres schema market in Docker)]
   S --> C[client/MlClient] --> ML[ml-api]
   W -.-> D[dto/]
   S -.-> Dom[domain/Property]
@@ -69,8 +69,9 @@ Validation failures are 400 here and 422 in the Python services; the portal trea
 
 ## Data and persistence
 
-- `DataSeeder` (an `ApplicationRunner`) reads `data/house_prices.csv` from the classpath, strips the UTF-8 BOM and saves 50 `Property` rows. The CSV is a copy of the one in `ml-api/data`.
-- H2 is in-memory (`jdbc:h2:mem:market`, `create-drop`), so the dataset is rebuilt on every start and nothing survives a restart. That is fine because it is reference data nobody writes.
+- `DataSeeder` (an `ApplicationRunner`) reads the file at `data.path` (`DATA_PATH`; default `../data/house_prices.csv`, `/data/house_prices.csv` in Docker, where the repo's `data/` is bind-mounted read-only), strips the UTF-8 BOM and saves 50 `Property` rows. The same file feeds ml-api training; there is one copy in the repo.
+- Default config is H2 in-memory (`jdbc:h2:mem:market`, `create-drop`), so `bootRun` and the tests need no database. The `docker` profile (`application-docker.yml`) points at the shared Postgres as role `market` with `hibernate.default_schema=market`, and uses `ddl-auto: create`: Hibernate drops and recreates the table at startup, with no migrations.
+- Reseeding is idempotent: the seeder runs `deleteAllInBatch()` before inserting, so a restart never duplicates rows (and rows removed from the CSV disappear). Nothing survives a restart on purpose: it is reference data nobody writes.
 - `open-in-view` is off; services open their own transactions through the repository.
 - Filtering is a JPA `Specification` (`Specification.allOf` over the non-null filters), shared by summary, segments, paging and exports. Sort keys are checked against a whitelist (`SORTABLE`) and snake_case is converted to the entity's camelCase.
 - Aggregates (summary, segments) are computed in Java over the filtered list (`ponytail` note in `MarketService`); with 50 rows that is simpler than JPQL aggregates.
@@ -101,7 +102,7 @@ Value-based record keys mean two requests with the same parameters hit the same 
 |---|---|
 | Java 21 | An LTS inside Boot 3.4's supported range (up to Java 24) that also runs on Gradle 8; JDK 25 would need Gradle 9. 21 avoids that toolchain upgrade. |
 | Gradle Kotlin DSL + version catalog | Typed build script; versions of non-BOM libraries in one file. Configuration cache and build cache are on in `gradle.properties`. |
-| H2 seeded from CSV | The dataset is small, read-only reference data; no external DB to run on a Pi. |
+| H2 locally, Postgres in Docker; both seeded from the mounted CSV | The same JPA code runs on both. H2 keeps `bootRun` and the tests dependency-free; Postgres matches the deployment. `create` plus a reseed is enough for 50 reference rows. |
 | JPA Specifications | One composable filter definition for four endpoints, no string-built queries. |
 | Records as cache keys | Immutable, value-based `equals`/`hashCode`. |
 | RestClient forced to HTTP/1.1 | Avoids the h2c upgrade uvicorn rejects. |

@@ -4,19 +4,56 @@ x-common: &common
   restart: unless-stopped
 
 services:
+  postgres:
+    <<: *common
+    image: postgres:17-alpine
+    # No published port: only the two backends reach it over the compose network.
+    environment:
+      POSTGRES_DB: housing
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_demo}
+      ESTIMATOR_DB_PASSWORD: ${ESTIMATOR_DB_PASSWORD:-estimator_demo}
+      MARKET_DB_PASSWORD: ${MARKET_DB_PASSWORD:-market_demo}
+    # Small-memory settings for a 4 GB Pi.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=64MB
+      - -c
+      - effective_cache_size=192MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=32MB
+      - -c
+      - max_connections=30
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    mem_limit: 384m
+    healthcheck:
+      # -h 127.0.0.1: the temporary init-time server only listens on the unix socket, so this stays unhealthy until init is done.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d housing"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
   ml-api:
     <<: *common
     build: ./ml-api
     image: ghcr.io/ekhrapykin/hpp-ml-api:${TAG:-latest}
     # Published so Swagger (/docs) can be shown live.
     ports: ["8000:8000"]
+    environment:
+      DATA_PATH: /data/house_prices.csv
+    volumes: ["./data:/data:ro"]
     mem_limit: 512m
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
       timeout: 3s
       retries: 5
-      start_period: 15s
+      start_period: 30s
 
   estimator-api:
     <<: *common
@@ -26,11 +63,11 @@ services:
     ports: ["8001:8001"]
     environment:
       ML_API_URL: http://ml-api:8000
-      DB_PATH: /data/estimates.db
-    volumes: [estimator-data:/data]
+      DATABASE_URL: postgresql+psycopg://estimator:${ESTIMATOR_DB_PASSWORD:-estimator_demo}@postgres:5432/housing
     mem_limit: 256m
     depends_on:
       ml-api: { condition: service_healthy }
+      postgres: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 10s
@@ -46,9 +83,14 @@ services:
     ports: ["8080:8080"]
     environment:
       ML_API_URL: http://ml-api:8000
+      SPRING_PROFILES_ACTIVE: docker
+      MARKET_DB_PASSWORD: ${MARKET_DB_PASSWORD:-market_demo}
+      DATA_PATH: /data/house_prices.csv
+    volumes: ["./data:/data:ro"]
     mem_limit: 640m
     depends_on:
       ml-api: { condition: service_healthy }
+      postgres: { condition: service_healthy }
     healthcheck:
       # temurin JRE images ship curl.
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
@@ -81,4 +123,4 @@ services:
       start_period: 15s
 
 volumes:
-  estimator-data:
+  postgres-data:

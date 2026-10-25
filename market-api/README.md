@@ -1,6 +1,6 @@
 # market-api
 
-Backend of the Market Explorer app. It loads the 50-row housing dataset into an in-memory H2 database at startup and serves filtered aggregates (summary, segment averages), a sortable/paged property list, CSV and PDF exports, and a what-if endpoint that asks `ml-api` for a price curve. The portal calls it through the Next.js rewrite `/api/market/*` (and directly from server components).
+Backend of the Market Explorer app. It seeds the 50-row housing dataset from `DATA_PATH` (the repo's `data/house_prices.csv`) into a database at startup (H2 in-memory locally, Postgres schema `market` in Docker) and serves filtered aggregates (summary, segment averages), a sortable/paged property list, CSV and PDF exports, and a what-if endpoint that asks `ml-api` for a price curve. The portal calls it through the Next.js rewrite `/api/market/*` (and directly from server components).
 
 System context: [../README.md](../README.md). Internals: [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -11,7 +11,7 @@ System context: [../README.md](../README.md). Internals: [ARCHITECTURE.md](ARCHI
 | Java | 21 (Gradle toolchain; `temurin-21` in `mise.toml`, `eclipse-temurin:21` images) |
 | Build | Gradle 8.14.6 wrapper, Kotlin DSL, version catalog `gradle/libs.versions.toml` |
 | Framework | Spring Boot 3.4.4 (web, validation, data-jpa, cache, actuator), virtual threads on |
-| Persistence | Hibernate/JPA on H2 in-memory (`ddl-auto: create-drop`) |
+| Persistence | Hibernate/JPA. Default: H2 in-memory (`create-drop`). `docker` profile: PostgreSQL via the `market` role and `default_schema=market` (`ddl-auto: create`) |
 | Cache | Caffeine via Spring Cache |
 | Docs | springdoc-openapi 2.8.6 |
 | PDF | OpenPDF 2.4.0 |
@@ -19,7 +19,7 @@ System context: [../README.md](../README.md). Internals: [ARCHITECTURE.md](ARCHI
 
 ## Run locally
 
-Needs `ml-api` only for `/what-if`; everything else works standalone.
+Needs `ml-api` only for `/what-if`; everything else works standalone (H2 in memory, CSV read from `../data/house_prices.csv`, relative to `market-api/`).
 
 ```bash
 # with mise (repo root)
@@ -36,8 +36,10 @@ Swagger UI: http://localhost:8080/swagger-ui.html (OpenAPI JSON at `/v3/api-docs
 
 ```bash
 docker build -t hpp-market-api market-api
-docker run --rm -p 8080:8080 -e ML_API_URL=http://host.docker.internal:8000 hpp-market-api
+docker run --rm -p 8080:8080 -e ML_API_URL=http://host.docker.internal:8000 -v "$PWD/data:/data:ro" -e DATA_PATH=/data/house_prices.csv hpp-market-api
 ```
+
+That runs on H2 like local dev. In compose the `docker` profile is active (`SPRING_PROFILES_ACTIVE=docker`), the CSV is bind-mounted read-only at `/data`, and the datasource is Postgres (`DATABASE_URL`, `MARKET_DB_PASSWORD`; user `market`, schema `market`). Hibernate creates the table (`ddl-auto: create`, no migrations) and the seeder reloads it on every start.
 
 Multi-stage build: JDK image runs `./gradlew bootJar`, the runtime is `eclipse-temurin:21-jre` as a non-root user with `JAVA_TOOL_OPTIONS=-Xmx256m -XX:+UseSerialGC`. Compose healthcheck: `curl -fsS http://localhost:8080/actuator/health` (40 s start period).
 
@@ -46,6 +48,8 @@ Multi-stage build: JDK image runs `./gradlew bootJar`, the runtime is `eclipse-t
 | Setting | Env var | Default | Purpose |
 |---|---|---|---|
 | `ml.api.url` | `ML_API_URL` | `http://localhost:8000` | ml-api base URL (blank falls back to the default) |
+| `data.path` | `DATA_PATH` | `../data/house_prices.csv` | Seed CSV (`/data/house_prices.csv` in Docker); UTF-8 BOM handled |
+| `spring.datasource.*` | `DATABASE_URL`, `MARKET_DB_PASSWORD` | H2 in-memory | `docker` profile only (`application-docker.yml`) |
 | `server.port` | | `8080` | |
 | `spring.cache.caffeine.spec` | | `maximumSize=500,expireAfterWrite=10m` | Applies to every cache |
 | `spring.data.web.pageable.max-page-size` | | `200` | Upper bound for `size` |
@@ -105,6 +109,6 @@ market-api/
     │   ├── dto/           # records: HouseFeatures, MarketFilter, WhatIfRequest, ...
     │   ├── config/        # AppConfig, MlProperties, DataSeeder
     │   └── exception/     # ApiException hierarchy, ApiExceptionHandler
-    ├── main/resources/    # application.yml, data/house_prices.csv
+    ├── main/resources/    # application.yml, application-docker.yml
     └── test/java/...      # see Tests
 ```

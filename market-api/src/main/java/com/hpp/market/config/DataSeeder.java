@@ -4,33 +4,36 @@ import com.hpp.market.domain.Property;
 import com.hpp.market.repository.PropertyRepository;
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/** Loads data/house_prices.csv (id,square_footage,bedrooms,bathrooms,year_built,lot_size,distance,school,price). */
+/** Loads the CSV at {@code data.path} (id,square_footage,bedrooms,bathrooms,year_built,lot_size,distance,school,price). */
 @Component
 public class DataSeeder implements ApplicationRunner {
     private final PropertyRepository repo;
+    private final Path csv;
 
-    public DataSeeder(PropertyRepository repo) {
+    public DataSeeder(PropertyRepository repo, @Value("${data.path}") Path csv) {
         this.repo = repo;
+        this.csv = csv;
     }
 
     @Override
     public void run(ApplicationArguments args) throws IOException {
-        try (var in = new BufferedReader(new InputStreamReader(
-                new ClassPathResource("data/house_prices.csv").getInputStream(), StandardCharsets.UTF_8))) {
+        try (BufferedReader in = Files.newBufferedReader(csv, StandardCharsets.UTF_8)) {
             List<Property> rows = in.lines()
                     .map(l -> l.replace("﻿", "").trim())
                     .filter(l -> !l.isEmpty() && !l.startsWith("id,"))
                     .map(DataSeeder::parse)
                     .toList();
+            repo.deleteAllInBatch(); // reseed from scratch, so a restart never duplicates or keeps stale rows
             repo.saveAll(rows);
         } catch (IOException e) {
             throw new UncheckedIOException(e);

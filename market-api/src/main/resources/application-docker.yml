@@ -1,0 +1,9 @@
+# Active in compose (SPRING_PROFILES_ACTIVE=docker): Postgres, schema `market`, own role.
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://postgres:5432/housing}
+    username: market
+    password: ${MARKET_DB_PASSWORD}
+  jpa:
+    hibernate.ddl-auto: create # drop and recreate at startup: the table is rebuilt from the CSV anyway
+    properties.hibernate.default_schema: market
