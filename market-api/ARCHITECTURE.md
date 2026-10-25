@@ -61,7 +61,7 @@ sequenceDiagram
 | `BadRequestException` | 400 | unknown sort property or what-if feature; ml-api answered 400/422 |
 | `UpstreamErrorException` | 502 | ml-api 5xx or a malformed/mismatched response |
 | `UpstreamUnavailableException` | 503 | connect/read timeout or connection failure |
-| `MethodArgumentNotValidException` | 400 | request-body validation; `detail` is `field message; ...` |
+| `MethodArgumentNotValidException` | 400 | request-body validation; `detail` is `field message; ...`, field paths in snake_case (`base.square_footage`, converted with Jackson's `SNAKE_CASE` strategy) |
 | Spring MVC defaults | 400 | bad `by` enum, missing parameter, type mismatch (via the base class) |
 
 Validation failures are 400 here and 422 in the Python services; the portal treats any non-2xx `detail` the same way.
@@ -114,4 +114,3 @@ Value-based record keys mean two requests with the same parameters hit the same 
 - In-memory aggregates and `findAll` for exports do not scale past a small dataset; push aggregation into JPQL or SQL and stream exports.
 - The CSV is duplicated with ml-api. A shared read-only `housing` schema would remove the copy (root [ARCHITECTURE.md](../ARCHITECTURE.md)).
 - No tests for exports or cache behaviour; no test hits a real ml-api.
-- Validation errors from nested objects report Java field paths (for example `base.squareFootage`) rather than snake_case names.

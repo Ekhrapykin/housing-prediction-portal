@@ -30,6 +30,7 @@ Every non-2xx response carries a JSON body with `detail`:
 
 - `detail` is a **string** everywhere, except FastAPI validation errors (422), where it is a **list of `{loc, msg, type}`**.
 - Python services (ml-api, estimator-api) answer validation failures with **422**; the Java service (market-api) answers with **400** (`ProblemDetail`, which has `detail`).
+- market-api validation messages name fields by their snake_case JSON path (`base.square_footage`), like the Python services' `loc`.
 - Clients must accept both shapes; the portal's `apiFetch` turns the list into a readable `field: message` string.
 
 ## Health endpoints

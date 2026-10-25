@@ -87,7 +87,7 @@ cd market-api && ./gradlew test        # or: mise exec -- ./gradlew test -q
 | Test | Covers |
 |---|---|
 | `PropertyRepositoryTest` (`@DataJpaTest`) | CSV seed loads 50 rows; a Specification narrows results |
-| `MarketControllerTest` (`@WebMvcTest`, services mocked) | summary happy path, bad `by` is 400, unknown what-if feature is 400 with `detail`, `steps` out of range is 400 |
+| `MarketControllerTest` (`@WebMvcTest`, services mocked) | summary happy path, bad `by` is 400, unknown what-if feature is 400 with `detail`, `steps` out of range is 400, an invalid nested field is reported with a snake_case path (`base.square_footage`) |
 | `MlClientTest` (`MockRestServiceServer`) | prices returned in order; 5xx becomes `UpstreamErrorException` |
 | `ContractTest` | `HouseFeatures` annotations vs `contracts/house-features.schema.json`; `Segment`, sort allow-list, `MarketFilter` params and `WhatIfRequest.steps` vs `contracts/market.json`. Gradle passes the `../contracts` path as `contracts.dir` and tracks it as a test input |
 | `MarketApplicationTests` (full context, MockMvc) | `/summary` over the real seed |

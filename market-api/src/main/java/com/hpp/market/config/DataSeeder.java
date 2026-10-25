@@ -20,9 +20,11 @@ public class DataSeeder implements ApplicationRunner {
     private final PropertyRepository repo;
     private final Path csv;
 
-    public DataSeeder(PropertyRepository repo, @Value("${data.path}") Path csv) {
+    // Bound as a String: Spring's Path conversion treats a relative value like "../data/x.csv" as a
+    // classpath resource and fails, so resolve it against the working directory ourselves.
+    public DataSeeder(PropertyRepository repo, @Value("${data.path}") String csv) {
         this.repo = repo;
-        this.csv = csv;
+        this.csv = Path.of(csv);
     }
 
     @Override

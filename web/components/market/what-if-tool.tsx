@@ -115,6 +115,7 @@ function WhatIf({ info }: { info: ModelInfo }) {
               </div>
               <Slider
                 aria-label={`${FIELD_LABEL[feature]} range`}
+                getThumbLabel={(i) => `${i === 0 ? "From" : "To"} ${FIELD_LABEL[feature]}`}
                 min={r.lo}
                 max={r.hi}
                 step={r.step}

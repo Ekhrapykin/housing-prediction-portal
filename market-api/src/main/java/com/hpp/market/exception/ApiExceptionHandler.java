@@ -1,5 +1,7 @@
 package com.hpp.market.exception;
 
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import java.util.Arrays;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -25,8 +27,15 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         String detail = ex.getBindingResult().getFieldErrors().stream()
-                .map(f -> f.getField() + " " + f.getDefaultMessage())
+                .map(f -> snakeCase(f.getField()) + " " + f.getDefaultMessage())
                 .collect(Collectors.joining("; "));
         return ResponseEntity.badRequest().body(ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail));
+    }
+
+    /** `base.squareFootage` to `base.square_footage`, the names clients see in the JSON. */
+    private static String snakeCase(String path) {
+        return Arrays.stream(path.split("\\.", -1))
+                .map(p -> PropertyNamingStrategies.SNAKE_CASE.nameForField(null, null, p))
+                .collect(Collectors.joining("."));
     }
 }

@@ -74,9 +74,13 @@ sequenceDiagram
 
 Estimator pages and `/market/what-if` create a query client, `await prefetch...(qc)` and wrap the client component in `<HydrationBoundary state={dehydrate(qc)}>`. The first paint has data and the client hooks take over (refetch, mutations, invalidation). `prefetchQuery` swallows errors and a failed query isn't dehydrated, so the client hook retries and shows its own error state.
 
+## Rewrites, headers and icon
+
+Rewrites are an allow-list built from `paths` in `lib/data/endpoints.ts`, so the backends' `/docs` and `/openapi.json` are not exposed. `headers()` adds nosniff, a strict referrer policy, `X-Frame-Options: DENY` plus CSP `frame-ancestors 'none'` and a `Permissions-Policy` for all routes (no full CSP: it would have to allow Next's inline scripts). The icon is `app/icon.svg`.
+
 ## Rewrites vs runtime env
 
-`next.config.ts` rewrites are resolved at `next build` and stored in the routes manifest; `lib/data/server.ts` reads the same env vars at runtime. Hence the Dockerfile passes `ESTIMATOR_API_URL` and `MARKET_API_URL` both as build args and as runtime env, and compose sets both.
+`next.config.ts` rewrites are resolved at `next build` and stored in the routes manifest; `lib/data/server.ts` reads the same env vars at runtime. The default URLs for both live in `lib/backends.ts` (compose hostnames, or `localhost` under `next dev`). Hence the Dockerfile passes `ESTIMATOR_API_URL` and `MARKET_API_URL` both as build args and as runtime env, and compose sets both.
 
 ## Caching policy
 
@@ -90,7 +94,7 @@ Estimator pages and `/market/what-if` create a query client, `await prefetch...(
 
 ## URL-driven filters
 
-Market filters, segment (`by`), sort and page live in the query string. URL state is managed by nuqs (`NuqsAdapter` in `app/providers.tsx`; parsers in `lib/data/search-params.ts`). `useMarketFilters` wraps `useQueryStates` with `shallow: false` and a `startTransition`, so the server components re-render and `isPending` dims the old view; nuqs queues rapid changes and keeps inputs in sync with Back/Forward and Reset. Number inputs use `limitUrlUpdates: debounce(400)`: the input updates at once, the URL follows when typing stops. Sort is two params (`?sort=price&dir=desc`); `loadProperties` translates it to market-api's `sort=price,desc`. Defaults are cleared from the URL (`clearOnDefault`). The dashboard's `Suspense` is keyed by the params, so every view is shareable and bookmarkable.
+Market filters, segment (`by`), sort and page live in the query string. URL state is managed by nuqs (`NuqsAdapter` in `app/providers.tsx`; parsers in `lib/data/search-params.ts`). `useMarketFilters` wraps `useQueryStates` with `shallow: false` and a `startTransition`, so the server components re-render and `isPending` dims the old view; nuqs queues rapid changes and keeps inputs in sync with the URL (Reset, shared links). Updates use `replace`, so Back/Forward does not step through filter changes; that is deliberate. Number inputs use `limitUrlUpdates: debounce(400)`: the input updates at once, the URL follows when typing stops. Sort is two params (`?sort=price&dir=desc`); `loadProperties` translates it to market-api's `sort=price,desc`. Defaults are cleared from the URL (`clearOnDefault`). The dashboard's `Suspense` is keyed by the params, so every view is shareable and bookmarkable.
 
 ## Errors
 
@@ -106,6 +110,7 @@ Market filters, segment (`by`), sort and page live in the query string. URL stat
 - Charts are `aria-hidden` with an `sr-only` table (caption, `scope`) carrying the same data.
 - Sortable headers set `aria-sort`; icon-only buttons have `aria-label`s; the "Best" badge in compare has `sr-only` text.
 - Loading skeletons use `role="status"`; errors use `role="alert"`; filter results set `aria-busy` while pending.
+- Each what-if slider thumb has its own label ("From …", "To …" plus the feature).
 - Route transition animation is disabled under `prefers-reduced-motion`.
 
 ## Key decisions

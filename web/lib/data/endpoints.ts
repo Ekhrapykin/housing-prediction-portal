@@ -9,10 +9,12 @@ export const paths = {
     segments: "/segments",
     properties: "/properties",
     whatIf: "/what-if",
+    exportCsv: "/export.csv",
+    exportPdf: "/export.pdf",
   },
   estimator: {
     estimates: "/estimates",
-    estimate: (id: number) => `/estimates/${id}`,
+    estimate: (id: number | string) => `/estimates/${id}`,
     estimatesByIds: (ids: number[]) => `/estimates?ids=${ids.join(",")}`,
     modelInfo: "/model-info",
   },
@@ -33,5 +35,5 @@ export function filtersQuery(filters: Record<string, number | null>): URLSearchP
 
 export function exportUrl(kind: "csv" | "pdf", filters: Record<string, number | null>): string {
   const q = filtersQuery(filters).toString();
-  return `${MARKET_BASE}/export.${kind}${q ? `?${q}` : ""}`;
+  return `${MARKET_BASE}${kind === "csv" ? paths.market.exportCsv : paths.market.exportPdf}${q ? `?${q}` : ""}`;
 }

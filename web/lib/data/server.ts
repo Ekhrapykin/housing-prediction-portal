@@ -8,9 +8,7 @@ import { filtersQuery, paths } from "./endpoints";
 import { queries } from "./queries";
 import { loadSearchParams } from "./search-params";
 import { MARKET_CACHE_TAG, MARKET_REVALIDATE_S } from "@/lib/config";
-
-const MARKET = process.env.MARKET_API_URL ?? "http://market-api:8080";
-const ESTIMATOR = process.env.ESTIMATOR_API_URL ?? "http://estimator-api:8001";
+import { ESTIMATOR_API_URL as ESTIMATOR, MARKET_API_URL as MARKET } from "@/lib/backends";
 
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 

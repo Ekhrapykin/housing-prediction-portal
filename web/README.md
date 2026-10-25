@@ -32,7 +32,7 @@ mise run lint:web         # eslint + tsc --noEmit
 
 # plain
 cd web
-cp .env.example .env.local   # points at localhost:8001 / localhost:8080
+cp .env.example .env.local   # optional: `next dev` already defaults to localhost:8001 / localhost:8080
 npm install
 npm run dev
 ```
@@ -54,7 +54,7 @@ The backend URLs are build args because rewrites are fixed at `next build`; the 
 | `ESTIMATOR_API_URL` | `http://estimator-api:8001` | `http://localhost:8001` | build (rewrites) and runtime (`lib/data/server.ts`) |
 | `MARKET_API_URL` | `http://market-api:8080` | `http://localhost:8080` | build (rewrites) and runtime (`lib/data/server.ts`) |
 
-The defaults are the compose service names, so a local `npm run dev` without `.env.local` will not reach the backends.
+The defaults live in `lib/backends.ts`, imported by both `next.config.ts` and `lib/data/server.ts`. In production (and so in the Docker build) they are the compose service names; when `NODE_ENV` is `development` (`npm run dev`) they are `http://localhost:8001` and `http://localhost:8080`, so the portal works without `.env.local`.
 
 ## Routes
 
@@ -68,7 +68,9 @@ The defaults are the compose service names, so a local `npm run dev` without `.e
 | `/market/properties?page=&sort=` | server-rendered, 15 per page | `GET /properties` |
 | `/market/what-if` | RSC prefetch of model info, client tool | `POST /what-if` (debounced, `WHAT_IF_DEBOUNCE_MS`) |
 
-Proxied paths: `/api/estimator/:path*` to `${ESTIMATOR_API_URL}/:path*`, and `/api/market/:path*` to `${MARKET_API_URL}/api/market/:path*`. The CSV and PDF export links use the latter directly.
+Proxied paths (an allow-list built from `paths` in `lib/data/endpoints.ts`): `/api/estimator/{estimates,estimates/:id,model-info}` to `${ESTIMATOR_API_URL}/...`, and `/api/market/{summary,segments,properties,what-if,export.csv,export.pdf}` to `${MARKET_API_URL}/api/market/...`. The CSV and PDF export links use the latter directly. Anything else, such as the backends' `/docs` and `/openapi.json`, is a 404 through the portal.
+
+Every response carries `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, `Content-Security-Policy: frame-ancestors 'none'` (frame-ancestors only, no full CSP) and a `Permissions-Policy` disabling camera, microphone and geolocation (`headers()` in `next.config.ts`). `X-Powered-By` is off. The tab icon is `app/icon.svg`, a house glyph in the primary colour.
 
 ## Checks
 

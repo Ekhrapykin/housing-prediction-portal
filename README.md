@@ -22,21 +22,63 @@ flowchart LR
 
 ## Requirements map
 
-| Requirement | Where it lives |
-|---|---|
-| Train a price model on the dataset | `ml-api/app/ml/train.py` (Ridge, 5-fold CV), run at ml-api startup from `data/house_prices.csv` |
-| Prediction API: single and batch | `POST /predict`, `POST /predict/batch` in `ml-api/app/api/predictions.py` |
-| Model insight | `GET /model-info`: coefficients, metrics, feature ranges |
-| Input validation and out-of-range handling | Pydantic bounds (422) + extrapolation `warnings` in `ml-api/app/services/predictor.py` |
-| Portal hosting both apps | `web/app/` with `/estimator` and `/market` |
-| App 1, Python backend: estimate, history, compare | `estimator-api` (`/estimates` CRUD, SQLAlchemy on Postgres) + `web/app/estimator/*` |
-| Per-feature price breakdown | `web/components/estimator/estimate-result.tsx` (coefficient x distance from mean) |
-| App 2, Java backend: market analytics | `market-api` `/api/market/summary`, `/segments`, `/properties` + `web/app/market/*` |
-| Filters, sorting, paging | JPA Specifications in market-api; URL-driven filters in the portal |
-| What-if analysis | `POST /api/market/what-if` (market-api calls ml-api batch) + `web/app/market/what-if` |
-| Export | `GET /api/market/export.csv`, `/export.pdf` |
-| Tests | pytest (both Python services), JUnit (market-api), lint/tsc/build (web) |
-| Containerisation and deployment | Dockerfiles, `docker-compose.yml`, `.github/workflows/ci-cd.yml`, Raspberry Pi runner |
+Against the task PDF ("Interview Tasks Fullstack"), paraphrased. "Partial" rows say what is missing.
+
+### Task 1: prediction API (`ml-api`)
+
+| Requirement | Where it lives | Status |
+|---|---|---|
+| Regression model on the provided dataset | `ml-api/app/ml/train.py` (scikit-learn Ridge, 5-fold CV), trained at startup from `data/house_prices.csv` | Done |
+| `predict`, single and batch | `POST /predict`, `POST /predict/batch` in `ml-api/app/api/predictions.py` | Done |
+| `model-info`: coefficients and performance metrics | `GET /model-info` in `ml-api/app/api/model_info.py` (also feature ranges) | Done |
+| `health` | `GET /health` in `ml-api/app/api/health.py` | Done |
+| Python 3.12+, FastAPI, scikit-learn | `ml-api/pyproject.toml` (Python 3.14) | Done |
+| Input validation and out-of-range handling (own addition) | Pydantic bounds (422) + extrapolation `warnings` in `ml-api/app/services/predictor.py` | Done |
+| Source on GitHub | This repository; not pushed yet | Partial |
+| Dockerfile | `ml-api/Dockerfile` | Done |
+| Live demo via Swagger/OpenAPI | `/docs` of each service (see Quick start) | Done locally; not yet running on the Pi |
+
+### Task 2: portal
+
+| Requirement | Where it lives | Status |
+|---|---|---|
+| Shared layout and navigation between the apps | `web/app/layout.tsx`, `web/components/nav.tsx`, `sub-nav.tsx` | Done |
+| App Router routing between and within apps | `web/app/estimator/*`, `web/app/market/*` | Done |
+| Consistent design system | shadcn components on Tailwind in `web/components/ui/` | Done |
+| Loading and error states at layout level | `loading.tsx`, `error.tsx`, `global-error.tsx`, `not-found.tsx` per layout | Done |
+| **App 1 frontend:** form with all model fields | `web/components/estimator/estimate-form.tsx`, `web/components/house-fields.tsx` | Done |
+| Client-side validation with messages | zod + react-hook-form (`web/lib/house-schema.ts`) | Done |
+| Result as table and as chart | `estimate-result.tsx` (table) + `contribution-chart.tsx` (per-feature breakdown) | Done |
+| History of previous estimates | `/estimator/history`, `history-table.tsx` | Done |
+| Side-by-side comparison | `/estimator/compare`, `compare-view.tsx` | Done |
+| **App 1 backend (Python):** form submissions, ml-api integration, validation and errors | `estimator-api` (`POST /estimates`, SQLAlchemy on Postgres, calls ml-api) | Done |
+| **App 2 frontend:** interactive dashboard with charts | `web/app/market`, `segment-chart.tsx`, `price-scatter.tsx` | Done |
+| Filters for segments | `filters.tsx`, URL-driven (`use-market-filters.ts`) | Done |
+| What-if tool using the model | `/market/what-if`, `what-if-tool.tsx`, `POST /api/market/what-if` | Done |
+| CSV and PDF export | `export-buttons.tsx`, `GET /api/market/export.csv`, `/export.pdf` | Done |
+| Responsive tables with sorting and filtering | `properties-table.tsx` (TanStack Table; sorting, filtering and paging are server-side in market-api) | Done |
+| **App 2 backend (Java):** REST endpoints, aggregate stats, ml-api integration | `market-api` `/api/market/summary`, `/segments`, `/properties`, `/what-if` (JPA Specifications; what-if calls ml-api batch) | Done |
+| Caching for performance | Caffeine cache on summary, segments and what-if in market-api; Next.js data cache (5 min) for market reads in the portal | Done |
+| App Router; server and client components used appropriately | RSC pages and loaders; client components only for forms, charts, tables, filters | Done |
+| RSC for initial data loading | `web/lib/data/server.ts` loaders and TanStack Query prefetch/hydration | Done |
+| Data fetching strategy | server loaders (market), TanStack Query (estimator, what-if), rewrites as same-origin proxy | Done |
+| Custom hooks for shared functionality | `web/hooks/` (`use-estimates`, `use-model-info`, `use-what-if`, `use-market-filters`, `use-debounce`) | Done |
+| Responsive layouts with Tailwind | Tailwind 4 utility classes throughout | Done, checked by eye, no device matrix |
+| Accessible components following WCAG | Skip link, landmarks, labelled fields and sliders, `aria-live` errors, `sr-only` chart tables, reduced-motion support (see [web/ARCHITECTURE.md](web/ARCHITECTURE.md#accessibility)) | Partial: basic measures, no formal audit |
+| Loading states and error boundaries | skeletons, `loading.tsx`, route and global error boundaries, inline `ErrorState` | Done |
+| Smooth transitions between pages and states | `web/app/template.tsx` fade-in, pending-state dimming on filter changes | Done |
+| Cohesive modern UI | shadcn/Tailwind theme | Done (subjective) |
+| Client-side state management | URL state (nuqs), TanStack Query cache, local component state; no global store | Done |
+| Form state with validation | react-hook-form + zod | Done |
+| Efficient data fetching and API error handling | query caching and stale times, abort/timeouts, `{detail}` normalised in `web/lib/api.ts` | Done |
+| Next.js code organisation | `app/`, `components/`, `hooks/`, `lib/` | Done |
+| Python 3.12+, FastAPI, Java 21, Spring Boot 3.4.4 | `pyproject.toml` (3.14), `market-api` (Java 21, Boot 3.4.4) | Done |
+| Source on GitHub | This repository; not pushed yet | Partial |
+| Live demo | `docker compose up --build`; the Pi deployment (CI/CD, arm64 images, runner) is prepared but not yet pushed or run | Partial |
+
+### Extras beyond the PDF
+
+Tests (pytest in both Python services, JUnit in market-api; web has lint, `tsc`, a contract check and a build but no unit tests), shared contracts with a contract test per service, Docker Compose with Postgres, and the CI/CD workflow.
 
 ## Quick start
 
@@ -73,7 +115,7 @@ mise tasks
 | `mise run test` | pytest in both Python services + `./gradlew test` |
 | `mise run up` / `down` | docker compose up --build / down |
 
-For `dev:web`, copy `web/.env.example` to `web/.env.local` so the portal points at `localhost`.
+`dev:web` defaults to `localhost:8001` and `localhost:8080` for the backends (set `ESTIMATOR_API_URL` / `MARKET_API_URL`, or copy `web/.env.example` to `web/.env.local`, to change that).
 
 ## Repository layout
 
@@ -95,8 +137,8 @@ For `dev:web`, copy `web/.env.example` to `web/.env.local` so the portal points 
 
 ```bash
 mise run test                 # or per service:
-cd ml-api && uv run pytest -q                                    # 7 tests (trains in lifespan)
-cd estimator-api && uv run pytest -q                             # 6 tests
+cd ml-api && uv run pytest -q                                    # 9 tests (trains in lifespan)
+cd estimator-api && uv run pytest -q                             # 8 tests
 cd market-api && ./gradlew test                                  # JUnit 5 + Spring Test
 cd web && npm run lint && npx tsc --noEmit                       # no unit tests in web
 ```

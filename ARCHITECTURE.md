@@ -190,3 +190,5 @@ flowchart LR
 - **Testcontainers for Postgres.** Run the repository and JPA tests against a real Postgres, so SQLite/H2 portability is checked, including the per-role schemas.
 - **Authentication and per-user history.** The estimate history is shared by everyone. A user id column on `estimates`, with auth at the portal, makes the isolation per user and not just per service.
 - **Backups.** The `postgres-data` volume is the only copy of the estimates. A scheduled `pg_dump` of the `estimator` schema to the host or object storage would protect it from a bad SD card.
+- **Web framework options left off on purpose.** Cache Components (`"use cache"`) and the React Compiler; `typedRoutes`; `@tailwindcss/postcss` instead of the Turbopack loader rule; `next/dynamic` for the charts.
+- **Back/Forward through filter changes.** Not supported: filter changes use `replace` deliberately, so history is not flooded with one entry per keystroke.

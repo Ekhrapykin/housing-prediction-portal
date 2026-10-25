@@ -64,4 +64,14 @@ class MarketControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").exists());
     }
+
+    @Test
+    void invalidNestedFieldIsReportedWithSnakeCasePath() throws Exception {
+        String bad = BASE.replace("1500", "-5");
+        mvc.perform(post("/api/market/what-if").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"base\":" + bad + ",\"feature\":\"bedrooms\",\"from\":1,\"to\":2,\"steps\":3}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("base.square_footage ")))
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("squareFootage"))));
+    }
 }
