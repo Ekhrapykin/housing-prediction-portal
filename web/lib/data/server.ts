@@ -3,8 +3,10 @@ import { unstable_rethrow } from "next/navigation";
 import { connection } from "next/server";
 import type { QueryClient } from "@tanstack/react-query";
 import type { Estimate, ModelInfo, Page, Property, SegmentRow, Summary } from "@/lib/types";
-import { paths, parseFilters, parsePage, parseSegmentKey, parseSort, type RawParams } from "./endpoints";
+import type { SearchParams } from "nuqs/server";
+import { filtersQuery, paths } from "./endpoints";
 import { queries } from "./queries";
+import { loadSearchParams } from "./search-params";
 
 const MARKET = process.env.MARKET_API_URL ?? "http://market-api:8080";
 const ESTIMATOR = process.env.ESTIMATOR_API_URL ?? "http://estimator-api:8001";
@@ -45,27 +47,26 @@ async function attempt<T>(p: Promise<T>): Promise<Result<T>> {
 const SCATTER_SIZE = 100;
 const PROPERTIES_PAGE_SIZE = 15;
 
-export async function loadMarketDashboard(raw: RawParams) {
+export async function loadMarketDashboard(raw: SearchParams) {
   await connection(); // needs the backend at request time; never prerender
-  const filters = parseFilters(raw);
-  const by = parseSegmentKey(raw);
+  const { by, filters } = loadSearchParams(raw);
+  const q = filtersQuery(filters);
   const [summary, segments, properties] = await Promise.all([
-    attempt(market<Summary>(paths.market.summary, filters)),
-    attempt(market<SegmentRow[]>(paths.market.segments, new URLSearchParams({ ...Object.fromEntries(filters), by }))),
-    attempt(market<Page<Property>>(paths.market.properties, new URLSearchParams({ ...Object.fromEntries(filters), size: String(SCATTER_SIZE) }))),
+    attempt(market<Summary>(paths.market.summary, q)),
+    attempt(market<SegmentRow[]>(paths.market.segments, new URLSearchParams({ ...Object.fromEntries(q), by }))),
+    attempt(market<Page<Property>>(paths.market.properties, new URLSearchParams({ ...Object.fromEntries(q), size: String(SCATTER_SIZE) }))),
   ]);
   return { by, filters, summary, segments, properties };
 }
 
-export async function loadProperties(raw: RawParams) {
+export async function loadProperties(raw: SearchParams) {
   await connection();
-  const filters = parseFilters(raw);
-  const sort = parseSort(raw);
-  const sp = new URLSearchParams(filters);
-  sp.set("page", String(parsePage(raw) - 1));
+  const { sort, dir, page, filters } = loadSearchParams(raw);
+  const sp = filtersQuery(filters);
+  sp.set("page", String(page - 1)); // the URL is 1-based, the backend 0-based
   sp.set("size", String(PROPERTIES_PAGE_SIZE));
-  if (sort) sp.set("sort", `${sort.key},${sort.dir}`);
-  return { filters, sort, properties: await attempt(market<Page<Property>>(paths.market.properties, sp)) };
+  if (sort) sp.set("sort", `${sort},${dir}`); // market-api's own format
+  return { filters, sort, dir, properties: await attempt(market<Page<Property>>(paths.market.properties, sp)) };
 }
 
 /**

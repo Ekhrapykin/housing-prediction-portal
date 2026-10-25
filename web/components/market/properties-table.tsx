@@ -14,7 +14,9 @@ import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { Sort } from "@/lib/data/endpoints";
+import { createSerializer } from "nuqs";
+import type { SortKey } from "@/lib/data/endpoints";
+import { propertiesParsers } from "@/lib/data/search-params";
 import { money, number } from "@/lib/format";
 import type { Page, Property } from "@/lib/types";
 
@@ -49,6 +51,8 @@ const HIDDEN: Record<string, string> = {
   year_built: "hidden sm:table-cell",
 };
 
+const serialize = createSerializer(propertiesParsers, { clearOnDefault: true });
+
 const ARIA_SORT = { asc: "ascending", desc: "descending" } as const;
 
 function PageLink({ href, disabled, children }: { href: string; disabled: boolean; children: React.ReactNode }) {
@@ -65,8 +69,10 @@ function PageLink({ href, disabled, children }: { href: string; disabled: boolea
   );
 }
 
+type Filters = Omit<Parameters<typeof serialize>[1] & object, "sort" | "dir" | "page">;
+
 /** `filters` are the market filters from the URL; links keep them and change only `page` / `sort`. */
-export function PropertiesTable({ data, sort, filters }: { data: Page<Property>; sort: Sort | null; filters: URLSearchParams }) {
+export function PropertiesTable({ data, sort, dir, filters }: { data: Page<Property>; sort: SortKey | null; dir: "asc" | "desc"; filters: Filters }) {
   const table = useTable({
     features,
     columns,
@@ -79,13 +85,9 @@ export function PropertiesTable({ data, sort, filters }: { data: Page<Property>;
   const lastPage = Math.max(Math.ceil(data.total / data.size), 1);
   const first = data.page * data.size + 1;
   const last = data.page * data.size + data.items.length;
-  const href = (patch: { page?: number; sort?: Sort }) => {
-    const q = new URLSearchParams(filters);
-    const s = patch.sort ?? sort;
-    if (s) q.set("sort", `${s.key},${s.dir}`);
-    if (patch.page && patch.page > 1) q.set("page", String(patch.page));
-    return `?${q}`;
-  };
+  // A sort change drops `page`, so it goes back to 1.
+  const href = (patch: { page: number } | { sort: SortKey; dir: "asc" | "desc" }) =>
+    serialize({ ...filters, sort, dir, ...("page" in patch ? patch : { ...patch, page: 1 }) }) || "?";
 
   return (
     <div className="space-y-4">
@@ -102,13 +104,13 @@ export function PropertiesTable({ data, sort, filters }: { data: Page<Property>;
             {table.getHeaderGroups().map((group) => (
               <TableRow key={group.id}>
                 {group.headers.map((header) => {
-                  const key = header.column.id as Sort["key"];
-                  const dir = sort?.key === key ? sort.dir : null;
-                  const Icon = dir === "asc" ? ArrowUp : dir === "desc" ? ArrowDown : ChevronsUpDown;
+                  const key = header.column.id as SortKey;
+                  const active = sort === key ? dir : null;
+                  const Icon = active === "asc" ? ArrowUp : active === "desc" ? ArrowDown : ChevronsUpDown;
                   return (
-                    <TableHead key={header.id} aria-sort={dir ? ARIA_SORT[dir] : "none"} className={HIDDEN[key]}>
+                    <TableHead key={header.id} aria-sort={active ? ARIA_SORT[active] : "none"} className={HIDDEN[key]}>
                       <Link
-                        href={href({ sort: { key, dir: dir === "asc" ? "desc" : "asc" } })}
+                        href={href({ sort: key, dir: active === "asc" ? "desc" : "asc" })}
                         scroll={false}
                         prefetch={false}
                         className="inline-flex items-center gap-1 rounded-sm font-medium hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"

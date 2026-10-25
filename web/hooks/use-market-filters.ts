@@ -1,42 +1,24 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useTransition } from "react";
+import { debounce, useQueryStates } from "nuqs";
+import { useTransition } from "react";
+import { marketParsers } from "@/lib/data/search-params";
+
+const TYPING_DEBOUNCE_MS = 400;
+
+type Params = ReturnType<typeof useQueryStates<typeof marketParsers>>[0];
 
 /** Market filters live in the URL; the server component re-renders on every change. */
 export function useMarketFilters() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
   const [isPending, startTransition] = useTransition();
-
-  // The URL (and window.location) only update once a navigation commits, so changes made while one is
-  // in flight build on this instead; otherwise the second change would overwrite the first.
-  const inFlight = useRef<string | null>(null);
-  useEffect(() => {
-    if (!isPending) inFlight.current = null;
-  }, [isPending]);
-
-  const go = useCallback(
-    (qs: string) => {
-      inFlight.current = qs;
-      startTransition(() => router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false }));
-    },
-    [router, pathname],
-  );
-
-  const set = useCallback(
-    (patch: Record<string, string | null>) => {
-      const next = new URLSearchParams(inFlight.current ?? window.location.search);
-      for (const [k, v] of Object.entries(patch)) {
-        if (v === null || v === "") next.delete(k);
-        else next.set(k, v);
-      }
-      go(next.toString());
-    },
-    [go],
-  );
-  const reset = useCallback(() => go(""), [go]);
-
-  return { params, get: (k: string) => params.get(k) ?? "", set, reset, isPending };
+  const [params, setParams] = useQueryStates(marketParsers, { shallow: false, clearOnDefault: true, startTransition });
+  return {
+    params,
+    isPending,
+    /** Immediate update (selects). */
+    set: (patch: Partial<Params>) => setParams(patch),
+    /** Local state updates at once; the URL (and server render) follows after typing stops. */
+    setTyped: (patch: Partial<Params>) => setParams(patch, { limitUrlUpdates: debounce(TYPING_DEBOUNCE_MS) }),
+    reset: () => setParams(null),
+  };
 }

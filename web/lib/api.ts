@@ -14,13 +14,22 @@ function readDetail(detail: unknown): string | null {
   return null;
 }
 
-/** Browser-side fetch. Every backend returns errors as `{ detail }`. */
+const TIMEOUT_MS = 10_000;
+
+/**
+ * Browser-side fetch. Every backend returns errors as `{ detail }`. `init.signal` cancels the request
+ * (the abort is re-thrown untouched so TanStack treats it as a cancellation); a timeout becomes an ApiError.
+ */
 export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
+  const timeout = AbortSignal.timeout(TIMEOUT_MS);
+  const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
   let res: Response;
   try {
     const headers = init?.body ? { "Content-Type": "application/json", ...init.headers } : init?.headers;
-    res = await fetch(url, { ...init, headers });
-  } catch {
+    res = await fetch(url, { ...init, headers, signal });
+  } catch (e) {
+    if (init?.signal?.aborted) throw e;
+    if (timeout.aborted) throw new ApiError(0, "The request timed out. Try again.");
     throw new ApiError(0, "Can't reach the server. Check your connection and try again.");
   }
   if (!res.ok) {

@@ -3,12 +3,12 @@ import { ExportButtons } from "@/components/market/export-buttons";
 import { PriceScatter } from "@/components/market/price-scatter";
 import { SegmentChart } from "@/components/market/segment-chart";
 import { StatCard } from "@/components/stat-card";
-import type { RawParams } from "@/lib/data/endpoints";
+import type { SearchParams } from "nuqs/server";
 import { loadMarketDashboard } from "@/lib/data/server";
 import { money } from "@/lib/format";
 
 /** The data regions of the market page; async so the filter bar can render while this streams. */
-export async function Dashboard({ raw }: { raw: RawParams }) {
+export async function Dashboard({ raw }: { raw: SearchParams }) {
   const { by, filters, summary, segments, properties } = await loadMarketDashboard(raw);
 
   if (!summary.ok) return <ErrorState title="Couldn't load the market" message={summary.error} />;

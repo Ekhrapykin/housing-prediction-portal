@@ -35,7 +35,8 @@ Pages, layouts and the market `Dashboard` are server components; the market app 
 
 | File | Role | Why this shape |
 |---|---|---|
-| `endpoints.ts` | Base paths (`/api/market`, `/api/estimator`), every backend path, URL parsers (`parseFilters`, `parseSort`, `parsePage`, `parseSegmentKey`), `exportUrl` | Paths and URL parsing are shared by server and browser code; one whitelist of filter keys. |
+| `endpoints.ts` | Base paths (`/api/market`, `/api/estimator`), every backend path, `SORT_KEYS`, `exportUrl` | Paths are shared by server and browser code. |
+| `search-params.ts` | nuqs parsers for every URL param (`filterParsers`, `marketParsers`, `propertiesParsers`) and the server `loadSearchParams` | One definition shared by the RSC loaders, `useQueryStates` and `createSerializer`; invalid values fall back to defaults. |
 | `queries.ts` | `queryOptions` factories: the only place query keys exist | Hooks, server prefetch and invalidation can't drift apart. `estimatesByIds` nests under `["estimates"]` so one invalidation covers both. |
 | `server.ts` | `server-only` loaders (`loadMarketDashboard`, `loadProperties`) and prefetchers (`prefetchModelInfo`, `prefetchEstimates`, `prefetchEstimatesByIds`) | Server code reaches backends by internal URL and owns caching; `server-only` stops it leaking into the client bundle. |
 | `query-client.ts` | `getQueryClient()`: new client per server request, singleton in the browser | Never share one user's cache across requests; defaults `staleTime` 30 s, `retry` 1, and pending queries are dehydrated too. |
@@ -52,10 +53,10 @@ sequenceDiagram
   participant L as loadMarketDashboard
   participant M as market-api
   U->>F: change a filter
-  F->>F: debounce 400 ms, router.replace(?min_price=...)
+  F->>F: nuqs setState (URL debounced 400 ms for typing, shallow: false)
   F->>P: RSC navigation in a transition (old view dimmed)
   P->>L: searchParams
-  L->>L: connection(), parseFilters
+  L->>L: connection(), loadSearchParams
   par
     L->>M: GET /summary
   and
@@ -88,11 +89,11 @@ Estimator pages and `/market/what-if` create a query client, `await prefetch...(
 
 ## URL-driven filters
 
-Market filters, segment (`by`), sort and page live in the query string. `useMarketFilters` patches the URL with `router.replace` inside `startTransition` and tracks the in-flight query string so rapid changes don't overwrite each other. Number inputs debounce 400 ms and accept URL changes they didn't make (Back/Forward, Reset). The dashboard's `Suspense` is keyed by the params, so every view is shareable and bookmarkable.
+Market filters, segment (`by`), sort and page live in the query string. URL state is managed by nuqs (`NuqsAdapter` in `app/providers.tsx`; parsers in `lib/data/search-params.ts`). `useMarketFilters` wraps `useQueryStates` with `shallow: false` and a `startTransition`, so the server components re-render and `isPending` dims the old view; nuqs queues rapid changes and keeps inputs in sync with Back/Forward and Reset. Number inputs use `limitUrlUpdates: debounce(400)`: the input updates at once, the URL follows when typing stops. Sort is two params (`?sort=price&dir=desc`); `loadProperties` translates it to market-api's `sort=price,desc`. Defaults are cleared from the URL (`clearOnDefault`). The dashboard's `Suspense` is keyed by the params, so every view is shareable and bookmarkable.
 
 ## Errors
 
-- **Contract:** every backend error is `{detail}`. `apiFetch` (browser) and `request` (server) surface a string `detail`; otherwise a generic message by status (5xx without `detail` means the rewrite proxy couldn't reach the backend).
+- **Contract:** every backend error is `{detail}`. `apiFetch` (browser) and `request` (server) surface a string `detail`; otherwise a generic message by status (5xx without `detail` means the rewrite proxy couldn't reach the backend). `apiFetch` also aborts after 10 s (`ApiError(0, "The request timed out…")`) and honours a caller `signal`; every `queryFn` passes TanStack's `signal`, and a cancellation is re-thrown as-is so it never shows as an error.
 - **`Result<T>` loaders:** `attempt()` turns each server fetch into `{ok, data} | {ok:false, error}`. Production strips messages thrown from server components, so loaders return them as data; one failed region (say segments) shows an inline `ErrorState` while the rest renders. `unstable_rethrow` lets Next's own control-flow errors through.
 - **Boundaries:** `app/error.tsx`, `app/market/error.tsx`, `app/estimator/error.tsx` share `RouteError` (generic text when the error has a `digest`), `global-error.tsx` covers the root layout, plus `not-found.tsx`. Mutations report through toasts.
 
