@@ -92,8 +92,6 @@ SQLite, stdlib `sqlite3`, one table:
 ## Known limitations and next steps
 
 - No authentication or per-user scoping: all clients share one history, and the portal never caches it (see the root [ARCHITECTURE.md](../ARCHITECTURE.md)).
-- `ids` filter: invalid ids are silently dropped, an all-invalid list falls back to the recent list, and result order follows SQLite rather than the request.
 - 422 `detail` is a list for validation errors but a string elsewhere; clients must handle both.
-- The image runs as root (no `USER` in the Dockerfile).
 - Single SQLite file means a single replica. A shared Postgres with one schema per service is the next step (root [ARCHITECTURE.md](../ARCHITECTURE.md)).
 - The prediction inherits ml-api's collinearity caveat ([../ml-api/ARCHITECTURE.md](../ml-api/ARCHITECTURE.md)).

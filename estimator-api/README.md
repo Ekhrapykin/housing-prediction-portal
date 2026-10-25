@@ -56,7 +56,7 @@ Read by `app/config.py` (env var = upper-cased field name).
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
 | POST | `/estimates` | Predict via ml-api and save | 201 with the stored estimate. Body is the 7 features plus optional `label` (max 80 chars). 422 invalid input (own validation, or ml-api's), 502 ml-api error, 503 ml-api unreachable |
-| GET | `/estimates` | List estimates | `limit` 1-500 (default 50), newest first. `ids=1,2,3` returns just those (comparison view); non-numeric ids are ignored, order is not guaranteed |
+| GET | `/estimates` | List estimates | `limit` 1-500 (default 50), newest first. `ids=1,2,3` returns just those in the requested order (comparison view); unknown ids are skipped, a non-integer id is a 422 |
 | GET | `/estimates/{id}` | One estimate | 404 `{"detail":"Estimate not found"}` |
 | DELETE | `/estimates/{id}` | Remove one | 204; 404 if missing |
 | GET | `/health` | Liveness | `{"status":"ok","ml_api":"up"\|"down"}`; always 200 |
@@ -70,7 +70,7 @@ All errors have the shape `{"detail": ...}`. `detail` is a string for service er
 cd estimator-api && uv sync && uv run pytest -q    # 6 passed
 ```
 
-- `tests/test_estimates_api.py` runs the real app against a temp SQLite file with a fake ML client injected through `app.dependency_overrides`. It covers create plus list, list by ids, unknown id (404), ml-api down (503), and invalid input (422 without calling ml-api).
+- `tests/test_estimates_api.py` runs the real app against a temp SQLite file with a fake ML client injected through `app.dependency_overrides`. It covers create plus list, list by ids in requested order, malformed ids (422), unknown id (404), ml-api down (503), and invalid input (422 without calling ml-api).
 - `tests/test_estimate_service.py` exercises `EstimateService` with an in-memory SQLite and the fake client, with no FastAPI at all.
 - Not covered: the real `MlClient` against HTTP (status mapping is untested), `limit` bounds, DELETE 204.
 

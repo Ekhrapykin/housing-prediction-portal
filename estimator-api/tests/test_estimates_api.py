@@ -13,8 +13,14 @@ def test_create_estimate_and_list(client):
 
 def test_list_by_ids(client):
     ids = [client.post("/estimates", json=BODY).json()["id"] for _ in range(3)]
-    r = client.get("/estimates", params={"ids": f"{ids[0]},{ids[2]}"})
-    assert sorted(e["id"] for e in r.json()) == [ids[0], ids[2]]
+    r = client.get("/estimates", params={"ids": f"{ids[2]},{ids[0]},999"})
+    assert [e["id"] for e in r.json()] == [ids[2], ids[0]]  # requested order, unknown id skipped
+
+
+def test_malformed_ids_is_422(client):
+    r = client.get("/estimates", params={"ids": "1,abc"})
+    assert r.status_code == 422
+    assert r.json()["detail"] == "ids must be comma-separated integers"
 
 
 def test_unknown_id_is_404(client):

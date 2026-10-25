@@ -34,9 +34,13 @@ class EstimateRepository:
         return [_to_estimate(r) for r in rows]
 
     def list_by_ids(self, ids: list[int]) -> list[Estimate]:
+        """In the requested order (the comparison view's column order); unknown ids are skipped."""
+        if not ids:
+            return []
         marks = ",".join("?" * len(ids))
         rows = self._conn.execute(f"SELECT * FROM estimates WHERE id IN ({marks})", ids).fetchall()
-        return [_to_estimate(r) for r in rows]
+        by_id = {r["id"]: _to_estimate(r) for r in rows}
+        return [by_id[i] for i in dict.fromkeys(ids) if i in by_id]
 
     def delete(self, estimate_id: int) -> bool:
         return self._conn.execute("DELETE FROM estimates WHERE id = ?", (estimate_id,)).rowcount > 0

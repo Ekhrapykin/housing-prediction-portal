@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from app.deps import EstimateServiceDep
 from app.schemas import Estimate, EstimateRequest
@@ -17,7 +17,12 @@ def list_estimates(
     ids: str | None = Query(default=None, description="Comma-separated ids, for the comparison view"),
     limit: int = Query(default=50, ge=1, le=500),
 ):
-    id_list = [int(i) for i in ids.split(",") if i.strip().isdigit()] if ids else None
+    id_list = None
+    if ids is not None:
+        try:
+            id_list = [int(i) for i in ids.split(",") if i.strip()]
+        except ValueError:
+            raise HTTPException(422, "ids must be comma-separated integers")
     return service.list(id_list, limit)
 
 

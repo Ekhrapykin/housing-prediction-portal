@@ -47,7 +47,7 @@ Rules:
 | Contract | Detail |
 |---|---|
 | JSON naming | snake_case everywhere. Python models use snake_case fields; market-api sets `spring.jackson.property-naming-strategy: SNAKE_CASE` and binds snake_case query params with `@BindParam`. |
-| Errors | Non-2xx responses carry `{"detail": ...}`. estimator-api uses an `AppError` handler; market-api returns `ProblemDetail` (which has `detail`); ml-api uses FastAPI defaults. `detail` is a string, except FastAPI validation 422s, where it is a list. Validation status differs: 422 in Python, 400 in Java. |
+| Errors | Non-2xx responses carry `{"detail": ...}`. estimator-api uses an `AppError` handler; market-api returns `ProblemDetail` (which has `detail`); ml-api uses FastAPI defaults. `detail` is a string, except FastAPI validation 422s, where it is a list of issues; the portal's `apiFetch` turns that list into a readable `field: message` string. Validation status differs: 422 in Python, 400 in Java. |
 | Health | ml-api and estimator-api `GET /health`, market-api `GET /actuator/health`, web `GET /`. Compose healthchecks and `depends_on: service_healthy` order startup: ml-api, then the two app backends, then web. |
 | Feature schema | The 7 features with identical bounds are defined in four places (below). |
 
@@ -131,7 +131,7 @@ flowchart LR
 ```
 
 - **Compose:** one file for laptop (`up --build`) and Pi (`pull` + `up -d --no-build`). Images are named `ghcr.io/ekhrapykin/hpp-<service>:${TAG:-latest}`. Memory limits: ml-api 512m, estimator-api 256m, market-api 640m (JVM `-Xmx256m`, SerialGC), web 384m.
-- **Images:** ml-api trains inside `docker build`; market-api is a multi-stage JDK-to-JRE build; web is a multi-stage Next `standalone` build with backend URLs as build args. market-api and web run as non-root.
+- **Images:** ml-api trains inside `docker build`; market-api is a multi-stage JDK-to-JRE build; web is a multi-stage Next `standalone` build with backend URLs as build args. All four images run as a non-root user.
 - **CI:** tests run on every push and PR. Images are built natively for arm64 on `ubuntu-24.04-arm` (no QEMU), with a GitHub Actions layer cache per service.
 - **CD:** the deploy job runs on the Pi's self-hosted runner with `TAG=${{ github.sha }}`, so it deploys exactly the images built in that run rather than whatever `latest` is. It waits up to 150 s for all containers to be healthy and fails the job otherwise. Rollback is `TAG=<older sha> docker compose up -d`.
 - **Exposure:** only port 3000 needs to be public (Tailscale Funnel or Cloudflare Tunnel). Backend ports are published for Swagger demos only.
@@ -174,7 +174,7 @@ flowchart LR
 
 - **Model coefficients are unstable.** The features are highly collinear, so single-feature coefficients have implausible signs (currently `square_footage`, `bedrooms` and `year_built` negative). Predictions are accurate, but the what-if curve can slope down as square footage rises, and the per-feature breakdown inherits the same problem. A larger fixed alpha trades a little R2 for sensible signs.
 - **Schema duplicated four times**; generate clients from ml-api's OpenAPI if it changes.
-- **Error contract is not uniform:** 400 vs 422 for validation, and FastAPI 422 `detail` is a list.
+- **Error contract is not uniform:** 400 vs 422 for validation, and FastAPI 422 `detail` is a list (the portal normalises it, other clients must handle both).
 - **No auth;** the estimate history is shared by everyone.
 - **No e2e tests,** and none of the portal's code is unit-tested.
 - **Single host, no TLS termination of its own;** relies on the tunnel.

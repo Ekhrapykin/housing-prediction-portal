@@ -36,6 +36,7 @@ run = "npm run lint && npx tsc --noEmit"
 
 [tasks.test]
 description = "Run pytest in both Python services and gradle test in market-api"
+depends = ["train"] # ml-api tests load the trained artifacts
 run = [
   "cd ml-api && uv run pytest -q",
   "cd estimator-api && uv run pytest -q",

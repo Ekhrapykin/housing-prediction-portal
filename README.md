@@ -66,7 +66,7 @@ mise tasks
 | `mise run dev:market` | market-api on :8080 (`./gradlew bootRun`) |
 | `mise run dev:web` | portal on :3000 |
 | `mise run lint:web` | eslint + `tsc --noEmit` |
-| `mise run test` | pytest in both Python services + `./gradlew test` |
+| `mise run test` | Trains the model, then pytest in both Python services + `./gradlew test` |
 | `mise run up` / `down` | docker compose up --build / down |
 
 For `dev:web`, copy `web/.env.example` to `web/.env.local` so the portal points at `localhost`.

@@ -19,7 +19,7 @@ class EstimateService:
         return est
 
     def list(self, ids: list[int] | None, limit: int) -> list[Estimate]:
-        return self._repo.list_by_ids(ids) if ids else self._repo.list_recent(limit)
+        return self._repo.list_by_ids(ids) if ids is not None else self._repo.list_recent(limit)
 
     def delete(self, estimate_id: int) -> None:
         if not self._repo.delete(estimate_id):

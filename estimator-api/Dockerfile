@@ -7,7 +7,9 @@ RUN uv sync --frozen --no-dev --no-install-project
 ENV PATH="/app/.venv/bin:$PATH"
 
 COPY app ./app
-RUN mkdir /data
+# A new named volume inherits /data's ownership, so the unprivileged user can write the SQLite file.
+RUN useradd --system --uid 10001 app && mkdir /data && chown app /data
+USER app
 
 EXPOSE 8001
 HEALTHCHECK --interval=15s --timeout=3s --retries=3 \
