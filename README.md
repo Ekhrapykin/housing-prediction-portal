@@ -78,7 +78,7 @@ Against the task PDF ("Interview Tasks Fullstack"), paraphrased. "Partial" rows 
 
 ### Extras beyond the PDF
 
-Tests (pytest in both Python services, JUnit in market-api; web has lint, `tsc`, a contract check and a build but no unit tests), shared contracts with a contract test per service, Docker Compose with Postgres, and the CI/CD workflow.
+Write rate limiting on estimator-api (slowapi) and an `X-Request-ID` that follows a request through the portal, every backend and the logs (see [ARCHITECTURE.md](ARCHITECTURE.md#rate-limiting)). Tests (pytest in both Python services, JUnit in market-api; web has lint, `tsc`, a contract check and a build but no unit tests), shared contracts with a contract test per service, Docker Compose with Postgres, and the CI/CD workflow.
 
 ## Quick start
 
@@ -137,8 +137,8 @@ mise tasks
 
 ```bash
 mise run test                 # or per service:
-cd ml-api && uv run pytest -q                                    # 9 tests (trains in lifespan)
-cd estimator-api && uv run pytest -q                             # 8 tests
+cd ml-api && uv run pytest -q                                    # 12 tests (trains in lifespan)
+cd estimator-api && uv run pytest -q                             # 18 tests
 cd market-api && ./gradlew test                                  # JUnit 5 + Spring Test
 cd web && npm run lint && npx tsc --noEmit                       # no unit tests in web
 ```

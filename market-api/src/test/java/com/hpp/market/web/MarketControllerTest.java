@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -39,6 +40,21 @@ class MarketControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(50))
                 .andExpect(jsonPath("$.avg_price").value(1));
+    }
+
+    @Test
+    void validIncomingRequestIdIsEchoed() throws Exception {
+        mvc.perform(get("/api/market/segments?by=NOPE").header("X-Request-ID", "test-123"))
+                .andExpect(header().string("X-Request-ID", "test-123"));
+    }
+
+    @Test
+    void missingOrInvalidRequestIdIsReplacedByUuid() throws Exception {
+        var uuid = "[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
+        mvc.perform(get("/api/market/segments?by=NOPE"))
+                .andExpect(header().string("X-Request-ID", org.hamcrest.Matchers.matchesPattern(uuid)));
+        mvc.perform(get("/api/market/segments?by=NOPE").header("X-Request-ID", "bad id"))
+                .andExpect(header().string("X-Request-ID", org.hamcrest.Matchers.matchesPattern(uuid)));
     }
 
     @Test

@@ -19,6 +19,8 @@ flowchart LR
 | Client | `app/clients/ml.py` | The only place that talks to ml-api; turns HTTP failures into domain errors. |
 | Schemas | `app/schemas.py` | Request and response models. |
 | Errors | `app/errors.py` | `AppError` hierarchy and one handler. |
+| Rate limit | `app/ratelimit.py` | slowapi `Limiter`, `client_key`, trusted-proxy resolution, the 429 handler. Routes opt in with `@limiter.shared_limit`. |
+| Request id | `app/request_id.py` | Pure ASGI middleware, `ContextVar`, log `Filter`, log format. `MlClient` reads the `ContextVar` and forwards the id. |
 | Config / deps / db | `config.py`, `deps.py`, `db.py` | Settings, wiring, the ORM model and the `Session` dependency. `deps.py` is the composition root: it builds a service per request. |
 
 Because the service takes plain collaborators, `test_estimate_service.py` runs it without FastAPI.
@@ -75,9 +77,15 @@ SQLAlchemy 2.0 with the typed declarative style (`DeclarativeBase`, `Mapped[...]
 
 `lifespan` creates one `httpx.Client(base_url, timeout)` and wraps it in `MlClient` on `app.state`. Connections are reused across requests and closed on shutdown. Per-call `is_healthy()` uses `ml_api_health_timeout` (2 s by default, in `Settings`) so `/health` never hangs for the full 5 s. Handlers are sync, so FastAPI's threadpool provides the concurrency and the sync client is fine.
 
+## Rate limiting and request ids
+
+`POST` and `DELETE /estimates` share one slowapi budget per client (`RATE_LIMIT_WRITES`, default `20/minute`); the 429 is `{"detail": ...}` plus `Retry-After`. The client key is the TCP peer, or the right-most `X-Forwarded-For` entry when the peer is one of `TRUSTED_PROXIES` (resolved to IPs on each write request, so a recreated `web` container is still recognised). Rationale and trust model: root [ARCHITECTURE.md](../ARCHITECTURE.md#rate-limiting). Storage is slowapi's in-memory default, so counters are per process.
+
+`RequestIdMiddleware` stores a valid incoming `X-Request-ID` (or a new UUID4) in a `ContextVar`, sets it on the response and logs one line per request. FastAPI copies the context into its threadpool, so sync routes and `MlClient` see it. Uvicorn's access log is disabled in `configure_logging()`; the middleware line replaces it (it adds the id and the duration).
+
 ## Testing seams
 
-`conftest.py` overrides `get_ml_client` with `FakeMlClient` through `app.dependency_overrides` and points `DATABASE_URL` at a temp-file SQLite database (clearing the `lru_cache` on `get_settings`). The real stack runs in tests except the network call.
+`conftest.py` resets the (process-wide) limiter before every test, offers a `make_client(peer=..., **env)` factory, and overrides `get_ml_client` with `FakeMlClient` through `app.dependency_overrides` and points `DATABASE_URL` at a temp-file SQLite database (clearing the `lru_cache` on `get_settings`). The real stack runs in tests except the network call.
 
 ## Key decisions
 

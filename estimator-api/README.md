@@ -51,29 +51,37 @@ Read by `app/config.py` (env var = upper-cased field name).
 | `ML_API_TIMEOUT` | `5.0` | Seconds, for the pooled httpx client |
 | `ML_API_HEALTH_TIMEOUT` | `2.0` | Seconds, for the ml-api probe in `/health` (kept short so `/health` never hangs) |
 | `DATABASE_URL` | `sqlite:///estimates.db` | SQLAlchemy URL; the table is created at startup (`create_all`). In Docker the `estimator` role's `search_path` puts it in schema `estimator` |
+| `RATE_LIMIT_WRITES` | `20/minute` | slowapi limit shared by `POST /estimates` and `DELETE /estimates/{id}`, per client |
+| `TRUSTED_PROXIES` | `web` | Comma-separated hostnames or IPs whose `X-Forwarded-For` is believed. Resolved to IPs on each write request; a name that doesn't resolve is skipped. Compose sets it explicitly |
 
 ## Endpoints
 
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
-| POST | `/estimates` | Predict via ml-api and save | 201 with the stored estimate. Body is the 7 features plus optional `label` (max 80 chars). 422 invalid input (own validation, or ml-api's), 502 ml-api error, 503 ml-api unreachable |
+| POST | `/estimates` | Predict via ml-api and save | 201 with the stored estimate. Body is the 7 features plus optional `label` (max 80 chars). 422 invalid input (own validation, or ml-api's), 429 rate limited, 502 ml-api error, 503 ml-api unreachable |
 | GET | `/estimates` | List estimates | `limit` 1-500 (default 50; `MAX_LIMIT` / `DEFAULT_LIMIT` in `api/estimates.py`), newest first. `ids=1,2,3` returns just those in the requested order (comparison view); unknown ids are skipped, a non-integer id is a 422 |
 | GET | `/estimates/{id}` | One estimate | 404 `{"detail":"Estimate not found"}` |
-| DELETE | `/estimates/{id}` | Remove one | 204; 404 if missing |
+| DELETE | `/estimates/{id}` | Remove one | 204; 404 if missing; 429 rate limited (shares the budget with POST) |
 | GET | `/health` | Liveness | `{"status":"ok","ml_api":"up"\|"down"}`; always 200 |
 | GET | `/model-info` | ml-api's model card, passed through | 502/503 as above |
+
+Rate limiting: only `POST` and `DELETE /estimates` are limited (`RATE_LIMIT_WRITES`); the 429 body is `{"detail": "Too many requests. Try again in N seconds."}` with a `Retry-After` header. The client is the TCP peer, or the right-most `X-Forwarded-For` entry when the peer is in `TRUSTED_PROXIES` (details in `app/ratelimit.py` and the root [ARCHITECTURE.md](../ARCHITECTURE.md#rate-limiting)). Counters are in-memory: fine for one replica, several replicas would need a shared store (Redis). The published `:8001` is limited too, keyed by the peer.
+
+Request ids: `X-Request-ID` is read (if it matches `^[A-Za-z0-9-]{1,64}$`) or generated, echoed in the response, put on every log line as `[req=...]` and forwarded to ml-api. The middleware logs one line per request (method, path, status, ms) and uvicorn's own access log is turned off to avoid duplicates.
 
 All errors have the shape `{"detail": ...}`. `detail` is a string for service errors, and a list (FastAPI/pydantic format) for 422s.
 
 ## Tests
 
 ```bash
-cd estimator-api && uv sync && uv run pytest -q    # 8 passed
+cd estimator-api && uv sync && uv run pytest -q    # 18 passed
 ```
 
 - `tests/test_estimates_api.py` runs the real app against a temp-file SQLite database with a fake ML client injected through `app.dependency_overrides`. It covers create plus list, list by ids in requested order, malformed ids (422), unknown id (404), ml-api down (503), and invalid input (422 without calling ml-api).
 - `tests/test_estimate_service.py` exercises `EstimateService` with a temp-file SQLite database and the fake client, with no FastAPI at all.
 - `tests/test_contract.py` compares `HouseFeatures.model_json_schema()` with `contracts/house-features.schema.json` (names, types, bounds, required).
+- `tests/test_rate_limit.py`: the 21st write is a 429 with `detail` and `Retry-After`, POST and DELETE share a budget, reads are never limited, a trusted peer is keyed by the right-most `X-Forwarded-For` entry, an untrusted peer can't pick its key with a forged one. The limiter is reset before every test.
+- `tests/test_request_id.py`: valid id echoed, missing or invalid id replaced by a UUID, id on error responses, `MlClient` forwards the current id (`httpx.MockTransport`).
 - Not covered: the real `MlClient` against HTTP (status mapping is untested), `limit` bounds, DELETE 204.
 
 ## Layout
@@ -86,6 +94,8 @@ estimator-api/
 │   ├── db.py              # ORM model (EstimateRow), engine and sessionmaker, init_db, get_session (request-scoped Session)
 │   ├── deps.py            # get_ml_client, get_estimate_service (builds the repo on the Session), *Dep aliases
 │   ├── errors.py          # AppError hierarchy + {detail} handler
+│   ├── ratelimit.py       # slowapi limiter, client_key (trusted-proxy XFF), 429 handler
+│   ├── request_id.py      # X-Request-ID middleware, log filter and format
 │   ├── schemas.py         # HouseFeatures, EstimateRequest, Estimate
 │   ├── api/               # estimates.py, health.py (routers)
 │   ├── services/estimates.py      # EstimateService (orchestration)

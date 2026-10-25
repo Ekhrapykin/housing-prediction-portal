@@ -60,9 +60,11 @@ services:
     build: ./estimator-api
     image: ghcr.io/ekhrapykin/hpp-estimator-api:${TAG:-latest}
     # Published for Swagger demos; the portal reaches it over the compose network, so drop this in a locked-down setup.
+    # The write rate limiter still applies on :8001, keyed by the TCP peer, because only `web` is trusted for X-Forwarded-For.
     ports: ["8001:8001"]
     environment:
       ML_API_URL: http://ml-api:8000
+      TRUSTED_PROXIES: web # same as the default; whose X-Forwarded-For the rate limiter believes
       DATABASE_URL: postgresql+psycopg://estimator:${ESTIMATOR_DB_PASSWORD:-estimator_demo}@postgres:5432/housing
     mem_limit: 256m
     depends_on:

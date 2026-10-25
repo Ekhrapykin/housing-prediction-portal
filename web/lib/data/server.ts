@@ -7,6 +7,7 @@ import type { SearchParams } from "nuqs/server";
 import { filtersQuery, paths } from "./endpoints";
 import { queries } from "./queries";
 import { loadSearchParams } from "./search-params";
+import { REQUEST_ID_HEADER } from "@/lib/api";
 import { MARKET_CACHE_TAG, MARKET_REVALIDATE_S } from "@/lib/config";
 import { ESTIMATOR_API_URL as ESTIMATOR, MARKET_API_URL as MARKET } from "@/lib/backends";
 
@@ -28,9 +29,12 @@ async function request<T>(service: string, url: string, init: RequestInit): Prom
 }
 
 // Market data is shared and cheap to cache; estimates are user data, so never cached.
+// Only the uncached estimator reads carry a fresh request id: Next puts request headers in the fetch cache key,
+// so a per-request id on the market reads would turn every one of them into a cache miss.
 const market = <T>(path: string, sp: URLSearchParams) =>
   request<T>("market", `${MARKET}/api/market${path}?${sp}`, { next: { revalidate: MARKET_REVALIDATE_S, tags: [MARKET_CACHE_TAG] } });
-const estimator = <T>(path: string) => request<T>("estimator", `${ESTIMATOR}${path}`, { cache: "no-store" });
+const estimator = <T>(path: string) =>
+  request<T>("estimator", `${ESTIMATOR}${path}`, { cache: "no-store", headers: { [REQUEST_ID_HEADER]: crypto.randomUUID() } });
 
 /** Resolve to data or a readable message (production strips messages thrown from server components). */
 async function attempt<T>(p: Promise<T>): Promise<Result<T>> {

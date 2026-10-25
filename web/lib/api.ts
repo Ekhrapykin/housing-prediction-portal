@@ -1,7 +1,11 @@
 import { REQUEST_TIMEOUT_MS } from "@/lib/config";
 
+/** Correlates one request across the portal's backends (contracts/README.md); echoed by every backend response. */
+export const REQUEST_ID_HEADER = "X-Request-ID";
+const REF_LENGTH = 8;
+
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public requestId?: string | null) {
     super(message);
   }
 }
@@ -37,9 +41,13 @@ export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
     // A 5xx without `detail` comes from the Next rewrite proxy when the backend itself is down.
     const fallback = res.status >= 500 ? "The service is unavailable right now. Try again in a moment." : `Request failed (${res.status})`;
     const detail = readDetail(body?.detail) ?? fallback;
-    throw new ApiError(res.status, detail);
+    throw new ApiError(res.status, detail, res.headers.get(REQUEST_ID_HEADER));
   }
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
-export const errorMessage = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
+/** Toast text. Appends a short reference to the request id so a user can quote it and the logs can be searched. */
+export const errorMessage = (e: unknown) => {
+  if (!(e instanceof Error)) return "Something went wrong";
+  return e instanceof ApiError && e.requestId ? `${e.message} · ref ${e.requestId.slice(0, REF_LENGTH)}` : e.message;
+};

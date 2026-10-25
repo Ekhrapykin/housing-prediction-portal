@@ -20,6 +20,7 @@ public class AppConfig {
                 .withConnectTimeout(props.connectTimeout())
                 .withReadTimeout(props.readTimeout());
         return builder.baseUrl(props.url())
+                .requestInterceptor(new RequestIdInterceptor())
                 .requestFactory(ClientHttpRequestFactoryBuilder.jdk()
                         // uvicorn rejects the JDK client's default h2c upgrade request
                         .withHttpClientCustomizer(c -> c.version(HttpClient.Version.HTTP_1_1))

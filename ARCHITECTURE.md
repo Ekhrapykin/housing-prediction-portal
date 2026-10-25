@@ -109,6 +109,42 @@ sequenceDiagram
   W-->>B: chart (previous curve kept while loading)
 ```
 
+## Rate limiting
+
+estimator-api limits writes: `POST /estimates` and `DELETE /estimates/{id}` share one budget per client (`RATE_LIMIT_WRITES`, default `20/minute`, slowapi). Reads are not limited. Over the limit: 429, `{"detail": "Too many requests. Try again in N seconds."}` and `Retry-After`. market-api's what-if has no limit of its own: the Caffeine cache and the `steps` cap (at most 50) bound its cost.
+
+**Who is "a client".** The key is the TCP peer address, except when the peer is a *trusted proxy* (`TRUSTED_PROXIES`, default `web`, resolved to IPs at startup): then it is the **right-most** `X-Forwarded-For` entry.
+
+- Why only from trusted peers: `X-Forwarded-For` is just a header. `:8001` is published for Swagger, so anyone who can reach it could send a new value per request and never be limited. A peer that isn't the portal gets keyed by its own address.
+- Why right-most: Next 16 doesn't append its own address to an existing `X-Forwarded-For`, and the tunnel (Tailscale Funnel or Cloudflare) appends the real client IP last. Everything to its left is client-supplied and can be forged; the last entry was written by infrastructure we trust.
+- The trusted set is resolved on every write request (Docker DNS, cheap at this rate), so recreating `web` with a new IP does not silently merge every portal user into one budget. Behind a different proxy chain the "right-most" rule has to be revisited.
+
+**Limitation.** Counters are in-memory per process: correct for the single replica we run. Several replicas would each keep their own counters; they need a shared store (Redis).
+
+## Request correlation
+
+`X-Request-ID` ties one user action to the log lines of every service it touches (header contract: [contracts/README.md](contracts/README.md#request-id)). It is born at the first backend, not at the browser.
+
+```mermaid
+sequenceDiagram
+  participant W as web
+  participant B as backend (estimator-api / market-api)
+  participant ML as ml-api
+  W->>B: request (server-side estimator reads send a fresh UUID; rewrites send none)
+  B->>B: valid incoming id or generate UUID4, put in ContextVar / MDC
+  B->>ML: same header on the outgoing call
+  ML->>ML: same rule, logs [req=id]
+  ML-->>B: response with X-Request-ID
+  B-->>W: response with X-Request-ID (also on errors)
+  W->>W: toast: "<detail> · ref <first 8 chars>"
+```
+
+- An incoming id is accepted only if it matches `^[A-Za-z0-9-]{1,64}$`, otherwise replaced by a UUID4. This prevents log injection.
+- Each service logs `[req=<id>]` on every line (`-` outside a request). The Python services log one line per request (method, path, status, ms) from the middleware and **disable uvicorn's access log** to avoid duplicates; market-api uses Spring's logging with an MDC pattern.
+- The id is carried by a `ContextVar` (Python; FastAPI copies the context into its threadpool) or the MDC (Java; a request runs on one thread, virtual or not, and the ml-api call is synchronous on it). The ml-api clients add it to every outgoing call.
+- Debugging recipe: copy the `ref` from a toast, then `docker compose logs estimator-api ml-api market-api | grep <ref>` (the first 8 characters are enough for a UUID).
+- The portal's cached market reads send no id: Next puts request headers in the fetch cache key, so a fresh id per request would disable the cache. market-api generates one for them.
+
 ## Caching across layers
 
 | Layer | What | Policy |
@@ -176,7 +212,7 @@ flowchart LR
 - **Collinear features.** The features correlate 0.91-0.99, so single-feature coefficients are not individually identifiable even though all are positive at alpha 10. Model quality was deliberately not optimised; the task is architectural. α=10 is fixed so coefficients stay interpretable on collinear features; model selection is a future improvement. See the data notes in [ml-api/ARCHITECTURE.md](ml-api/ARCHITECTURE.md#data-notes).
 - **Schema duplicated four times**, with drift caught by the contract tests in `contracts/`; generate clients from ml-api's OpenAPI if it changes.
 - **Error contract is not uniform:** 400 vs 422 for validation, and FastAPI 422 `detail` is a list (the portal normalises it, other clients must handle both).
-- **No auth;** the estimate history is shared by everyone.
+- **No auth;** the estimate history is shared by everyone. The write rate limit is per client address, not per user.
 - **No e2e tests,** and the portal has only the contract check, no unit tests.
 - **Single host, no TLS termination of its own;** relies on the tunnel.
 
@@ -192,3 +228,10 @@ flowchart LR
 - **Backups.** The `postgres-data` volume is the only copy of the estimates. A scheduled `pg_dump` of the `estimator` schema to the host or object storage would protect it from a bad SD card.
 - **Web framework options left off on purpose.** Cache Components (`"use cache"`) and the React Compiler; `typedRoutes`; `@tailwindcss/postcss` instead of the Turbopack loader rule; `next/dynamic` for the charts.
 - **Back/Forward through filter changes.** Not supported: filter changes use `replace` deliberately, so history is not flooded with one entry per keystroke.
+- **Retry with backoff.** One retry on connect error for the idempotent `/predict`, if redeploys start producing errors. *Why not now:* compose `depends_on: service_healthy` already covers first start and ml-api restarts in about 1-2 s, so it isn't needed at the current startup time.
+- **Circuit breaker.** *Why not now:* two callers and one dependency; overkill at this scale.
+- **Prometheus and Grafana.** *Why not now:* too heavy for the Pi's memory budget (the compose limits are already tight), and `/metrics` with no consumer shows nothing; request-id logs cover debugging for now.
+- **Authentication.** Already recorded under limitations. *Why not now:* not part of the task.
+- **Distributed rate limiting with Redis.** *Why not now:* needed only with several replicas; one replica's in-memory counters are exact.
+- **Structured JSON logs with central log collection.** *Why not now:* `docker compose logs | grep <request id>` is enough for one host and three services.
+- **Input sanitization.** *Why not now:* already enforced at every boundary by Pydantic, zod and Jakarta Validation, with the contracts checked by tests.

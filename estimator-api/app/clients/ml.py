@@ -1,6 +1,13 @@
 import httpx
 
 from app.errors import UpstreamError, UpstreamUnavailable, UpstreamValidationError
+from app.request_id import HEADER, current_request_id
+
+
+def _trace_headers() -> dict[str, str]:
+    """Forward the current request's id so ml-api logs the same one."""
+    rid = current_request_id()
+    return {HEADER: rid} if rid else {}
 
 
 class MlClient:
@@ -16,13 +23,13 @@ class MlClient:
 
     def is_healthy(self) -> bool:
         try:
-            return self._http.get("/health", timeout=self._health_timeout).is_success
+            return self._http.get("/health", headers=_trace_headers(), timeout=self._health_timeout).is_success
         except httpx.HTTPError:
             return False
 
     def _request(self, method: str, path: str, **kwargs) -> dict:
         try:
-            r = self._http.request(method, path, **kwargs)
+            r = self._http.request(method, path, headers=_trace_headers(), **kwargs)
         except httpx.HTTPError as e:
             raise UpstreamUnavailable() from e
         if r.status_code == 422:

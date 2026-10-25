@@ -18,4 +18,5 @@ spring:
     type: caffeine
     caffeine.spec: maximumSize=500,expireAfterWrite=10m
   data.web.pageable.max-page-size: 200
+logging.pattern.level: "%5p [req=%X{requestId:--}]" # request id from RequestIdFilter
 management.endpoints.web.exposure.include: health

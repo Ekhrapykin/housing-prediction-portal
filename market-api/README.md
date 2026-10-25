@@ -54,6 +54,7 @@ Multi-stage build: JDK image runs `./gradlew bootJar`, the runtime is `eclipse-t
 | `server.port` | | `8080` | |
 | `ml.api.connect-timeout` | | `2s` | ml-api connect timeout (`MlProperties`) |
 | `ml.api.read-timeout` | | `5s` | ml-api read timeout (`MlProperties`) |
+| `logging.pattern.level` | | `%5p [req=%X{requestId:--}]` | Adds the request id (from `RequestIdFilter`) to every log line |
 | `spring.cache.caffeine.spec` | | `maximumSize=500,expireAfterWrite=10m` | Applies to every cache |
 | `spring.data.web.pageable.max-page-size` | | `200` | Upper bound for `size` |
 
@@ -111,7 +112,7 @@ market-api/
     │   ├── client/        # MlClient
     │   ├── domain/        # Property (JPA entity)
     │   ├── dto/           # records: HouseFeatures, MarketFilter, WhatIfRequest, ...
-    │   ├── config/        # AppConfig, MlProperties
+    │   ├── config/        # AppConfig, MlProperties, RequestIdInterceptor
     │   ├── ingest/        # CsvPropertySync (CSV → market table on start)
     │   └── exception/     # ApiException hierarchy, ApiExceptionHandler
     ├── main/resources/    # application.yml, application-docker.yml

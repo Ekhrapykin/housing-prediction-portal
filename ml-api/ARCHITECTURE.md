@@ -65,6 +65,10 @@ Model quality was deliberately not optimised; the task is architectural. α=10 i
 
 ml-api registers no custom handler. FastAPI's default 422 body is `{"detail": [ {loc, msg, type, ...} ]}` (a list, not a string). `estimator-api` and `market-api` translate that into their own `{detail}` contract; see [../estimator-api/ARCHITECTURE.md](../estimator-api/ARCHITECTURE.md) and [../market-api/ARCHITECTURE.md](../market-api/ARCHITECTURE.md). Out-of-range values are not errors; they come back as `warnings`.
 
+## Request id and logs
+
+`RequestIdMiddleware` (`app/request_id.py`, pure ASGI) takes a valid `X-Request-ID` from the caller or generates a UUID4, keeps it in a `ContextVar`, sets it on the response and logs one line per request. A log `Filter` adds it to every record (`[req=%(request_id)s]`, `-` outside a request). Uvicorn's access log is disabled in favour of the middleware line. The file is identical in estimator-api.
+
 ## Data and persistence
 
 No database. The training CSV is the single copy at the repo root (`data/house_prices.csv`), bind-mounted read-only at `/data` in Docker and read via `DATA_PATH`. Nothing is written at runtime; `artifacts/` is only produced by the optional CLI and is git-ignored.

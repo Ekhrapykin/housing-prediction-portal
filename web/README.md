@@ -54,6 +54,8 @@ The backend URLs are build args because rewrites are fixed at `next build`; the 
 | `ESTIMATOR_API_URL` | `http://estimator-api:8001` | `http://localhost:8001` | build (rewrites) and runtime (`lib/data/server.ts`) |
 | `MARKET_API_URL` | `http://market-api:8080` | `http://localhost:8080` | build (rewrites) and runtime (`lib/data/server.ts`) |
 
+Request ids: server-side estimator reads send a fresh `crypto.randomUUID()` as `X-Request-ID`; `apiFetch` stores the id of an error response on `ApiError.requestId` and `errorMessage()` appends ` · ref <first 8 chars>` to toasts. No configuration.
+
 The defaults live in `lib/backends.ts`, imported by both `next.config.ts` and `lib/data/server.ts`. In production (and so in the Docker build) they are the compose service names; when `NODE_ENV` is `development` (`npm run dev`) they are `http://localhost:8001` and `http://localhost:8080`, so the portal works without `.env.local`.
 
 ## Routes

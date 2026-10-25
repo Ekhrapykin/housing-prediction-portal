@@ -67,6 +67,12 @@ sequenceDiagram
 
 Validation failures are 400 here and 422 in the Python services; the portal treats any non-2xx `detail` the same way.
 
+## Request id
+
+`RequestIdFilter` (`web/`, `OncePerRequestFilter`, highest precedence) accepts a valid `X-Request-ID` (`^[A-Za-z0-9-]{1,64}$`) or generates a UUID4, puts it in the MDC as `requestId`, sets the response header, logs one line per request (method, path, status, ms, like the Python services) and clears the MDC in `finally`. `logging.pattern.level` prints it as `[req=...]`. `RequestIdInterceptor` on the ml-api `RestClient` copies it from the MDC to the outgoing call. Virtual threads are on, but a request runs start to finish on one thread and the ml-api call is made synchronously on it, so the thread-bound MDC is visible to the interceptor. If code ever hands work to another thread, it must copy the MDC itself.
+
+There is no rate limit on what-if: the Caffeine cache and the `steps` cap (at most 50) bound its cost.
+
 ## Data and persistence
 
 - `CsvPropertySync` (an `ApplicationRunner`) reads the file at `data.path` (`DATA_PATH`; default `../data/house_prices.csv`, `/data/house_prices.csv` in Docker, where the repo's `data/` is bind-mounted read-only), strips the UTF-8 BOM and saves 50 `Property` rows. The same file feeds ml-api training; there is one copy in the repo.

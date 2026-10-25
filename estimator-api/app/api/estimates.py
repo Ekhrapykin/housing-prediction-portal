@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from app.deps import EstimateServiceDep
+from app.ratelimit import limiter, write_limit
 from app.schemas import Estimate, EstimateRequest
 
 DEFAULT_LIMIT = 50  # the history view shows recent estimates, not everything
@@ -10,7 +11,8 @@ router = APIRouter(prefix="/estimates", tags=["estimates"])
 
 
 @router.post("", response_model=Estimate, status_code=201)
-def create_estimate(req: EstimateRequest, service: EstimateServiceDep):
+@limiter.shared_limit(write_limit, scope="estimate-writes")  # slowapi needs the `request` argument
+def create_estimate(request: Request, req: EstimateRequest, service: EstimateServiceDep):
     return service.create(req)
 
 
@@ -35,5 +37,6 @@ def get_estimate(estimate_id: int, service: EstimateServiceDep):
 
 
 @router.delete("/{estimate_id}", status_code=204)
-def delete_estimate(estimate_id: int, service: EstimateServiceDep):
+@limiter.shared_limit(write_limit, scope="estimate-writes")
+def delete_estimate(request: Request, estimate_id: int, service: EstimateServiceDep):
     service.delete(estimate_id)

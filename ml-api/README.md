@@ -50,6 +50,8 @@ Read by `app/config.py` (pydantic-settings, env var = upper-cased field name).
 | `MODEL_ALPHA` | `10.0` | Ridge strength. Fixed, not cross-validated. Model quality was deliberately not optimised; the task is architectural. α=10 is fixed so coefficients stay interpretable on collinear features; model selection is a future improvement |
 | `ARTIFACTS_DIR` | `ml-api/artifacts` | Only the `python -m app.ml.train` CLI writes here; the API does not read it |
 
+Every request gets an `X-Request-ID` (a valid incoming one, matching `^[A-Za-z0-9-]{1,64}$`, or a generated UUID4), echoed in the response and shown on each log line as `[req=...]`. The middleware logs one line per request and uvicorn's access log is disabled to avoid duplicates. No configuration.
+
 ## Endpoints
 
 | Method | Path | Purpose | Notes |
@@ -75,10 +77,10 @@ curl -s localhost:8000/predict -H 'content-type: application/json' -d '{
 ## Tests
 
 ```bash
-cd ml-api && uv sync && uv run pytest -q   # 9 passed
+cd ml-api && uv sync && uv run pytest -q   # 12 passed
 ```
 
-`tests/test_api.py` drives the real app, which trains on the repo's CSV in `lifespan`, through `TestClient`: health, a plausible single price (150k-450k, no warnings), batch count, empty batch and out-of-range input rejected with 422, an extrapolation warning, and `/model-info` shape. `test_api.py` also asserts the `square_footage`, `bedrooms` and `year_built` coefficients are positive at the default alpha. `tests/test_contract.py` compares `HouseFeatures.model_json_schema()` with `contracts/house-features.schema.json`. There are no unit tests for `train.py`; CI just runs pytest.
+`tests/test_api.py` drives the real app, which trains on the repo's CSV in `lifespan`, through `TestClient`: health, a plausible single price (150k-450k, no warnings), batch count, empty batch and out-of-range input rejected with 422, an extrapolation warning, and `/model-info` shape. `test_api.py` also asserts the `square_footage`, `bedrooms` and `year_built` coefficients are positive at the default alpha. `tests/test_request_id.py` covers the request id (echo, generate, replace invalid). `tests/test_contract.py` compares `HouseFeatures.model_json_schema()` with `contracts/house-features.schema.json`. There are no unit tests for `train.py`; CI just runs pytest.
 
 ## Layout
 
@@ -92,7 +94,7 @@ ml-api/
 │   ├── api/               # health.py, predictions.py, model_info.py (routers)
 │   ├── services/predictor.py  # Predictor: predict, extrapolation warnings
 │   └── ml/                # features.py (FEATURES, TARGET), train.py (train() + CLI; CV_FOLDS, CV_RANDOM_STATE constants)
-├── tests/                 # conftest.py, test_api.py, test_contract.py
+├── tests/                 # conftest.py, test_api.py, test_request_id.py, test_contract.py
 ├── Dockerfile             # no training, no data: both arrive at runtime
 └── pyproject.toml, uv.lock
 ```
