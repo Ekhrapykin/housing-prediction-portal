@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "house-features.schema.json",
+  "title": "HouseFeatures",
+  "description": "The 7 model features. Source of truth for every service's native copy; see README.md.",
+  "type": "object",
+  "properties": {
+    "square_footage": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 20000
+    },
+    "bedrooms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 20
+    },
+    "bathrooms": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 20
+    },
+    "year_built": {
+      "type": "integer",
+      "minimum": 1800,
+      "maximum": 2100
+    },
+    "lot_size": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1000000
+    },
+    "distance_to_city_center": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 500
+    },
+    "school_rating": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10
+    }
+  },
+  "required": [
+    "square_footage",
+    "bedrooms",
+    "bathrooms",
+    "year_built",
+    "lot_size",
+    "distance_to_city_center",
+    "school_rating"
+  ],
+  "additionalProperties": false
+}

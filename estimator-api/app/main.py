@@ -17,7 +17,7 @@ async def lifespan(app: FastAPI):
     init_db(engine)
     app.state.session_factory = make_session_factory(engine)
     with httpx.Client(base_url=settings.ml_api_url, timeout=settings.ml_api_timeout) as http:
-        app.state.ml_client = MlClient(http)
+        app.state.ml_client = MlClient(http, settings.ml_api_health_timeout)
         yield
     engine.dispose()
 

@@ -7,6 +7,7 @@ import type { SearchParams } from "nuqs/server";
 import { filtersQuery, paths } from "./endpoints";
 import { queries } from "./queries";
 import { loadSearchParams } from "./search-params";
+import { MARKET_CACHE_TAG, MARKET_REVALIDATE_S } from "@/lib/config";
 
 const MARKET = process.env.MARKET_API_URL ?? "http://market-api:8080";
 const ESTIMATOR = process.env.ESTIMATOR_API_URL ?? "http://estimator-api:8001";
@@ -30,7 +31,7 @@ async function request<T>(service: string, url: string, init: RequestInit): Prom
 
 // Market data is shared and cheap to cache; estimates are user data, so never cached.
 const market = <T>(path: string, sp: URLSearchParams) =>
-  request<T>("market", `${MARKET}/api/market${path}?${sp}`, { next: { revalidate: 300, tags: ["market"] } });
+  request<T>("market", `${MARKET}/api/market${path}?${sp}`, { next: { revalidate: MARKET_REVALIDATE_S, tags: [MARKET_CACHE_TAG] } });
 const estimator = <T>(path: string) => request<T>("estimator", `${ESTIMATOR}${path}`, { cache: "no-store" });
 
 /** Resolve to data or a readable message (production strips messages thrown from server components). */

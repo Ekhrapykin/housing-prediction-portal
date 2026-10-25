@@ -1,7 +1,6 @@
 package com.hpp.market.config;
 
 import java.net.http.HttpClient;
-import java.time.Duration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
@@ -18,8 +17,8 @@ public class AppConfig {
     @Bean
     RestClient mlRestClient(MlProperties props, RestClient.Builder builder) {
         var settings = ClientHttpRequestFactorySettings.defaults()
-                .withConnectTimeout(Duration.ofSeconds(2))
-                .withReadTimeout(Duration.ofSeconds(5));
+                .withConnectTimeout(props.connectTimeout())
+                .withReadTimeout(props.readTimeout());
         return builder.baseUrl(props.url())
                 .requestFactory(ClientHttpRequestFactoryBuilder.jdk()
                         // uvicorn rejects the JDK client's default h2c upgrade request

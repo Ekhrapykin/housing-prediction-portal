@@ -1,0 +1,36 @@
+{
+  "description": "Market-api query contract mirrored by market-api (Java) and web. Filter types are what the backend accepts; a client may narrow number to integer, never the reverse.",
+  "segment_keys": [
+    "BEDROOMS",
+    "SCHOOL_RATING",
+    "DISTANCE",
+    "DECADE"
+  ],
+  "sort_keys": [
+    "id",
+    "square_footage",
+    "bedrooms",
+    "bathrooms",
+    "year_built",
+    "lot_size",
+    "distance_to_city_center",
+    "school_rating",
+    "price"
+  ],
+  "filters": {
+    "min_bedrooms": "integer",
+    "max_bedrooms": "integer",
+    "min_price": "number",
+    "max_price": "number",
+    "min_school_rating": "number",
+    "max_distance": "number",
+    "min_year_built": "integer",
+    "max_year_built": "integer"
+  },
+  "what_if": {
+    "steps": {
+      "minimum": 2,
+      "maximum": 50
+    }
+  }
+}

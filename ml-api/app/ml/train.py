@@ -3,9 +3,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import joblib
-import numpy as np
 import pandas as pd
-from sklearn.linear_model import RidgeCV
+from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, r2_score, root_mean_squared_error
 from sklearn.model_selection import KFold, cross_validate
 from sklearn.pipeline import Pipeline, make_pipeline
@@ -15,16 +14,21 @@ from app.config import get_settings
 from app.ml.features import FEATURES, TARGET
 
 
-def train(data_path: Path) -> tuple[Pipeline, dict]:
+# Fixed modelling decisions (alpha is config: Settings.model_alpha). See the Ridge decision in ARCHITECTURE.md.
+CV_FOLDS = 5  # 50 rows: 5 folds leave 10 rows per test fold
+CV_RANDOM_STATE = 42  # fixed so training (and the model card) is deterministic
+
+
+def train(data_path: Path, alpha: float) -> tuple[Pipeline, dict]:
     """Fit the model on the CSV; returns the pipeline and its model card. Deterministic (fixed CV seed)."""
     df = pd.read_csv(data_path, encoding="utf-8-sig")
     X, y = df[FEATURES], df[TARGET]
 
-    pipe = make_pipeline(StandardScaler(), RidgeCV(alphas=np.logspace(-3, 3, 25)))
+    pipe = make_pipeline(StandardScaler(), Ridge(alpha=alpha))
 
     cv = cross_validate(
         pipe, X, y,
-        cv=KFold(n_splits=5, shuffle=True, random_state=42),
+        cv=KFold(n_splits=CV_FOLDS, shuffle=True, random_state=CV_RANDOM_STATE),
         scoring={"r2": "r2", "rmse": "neg_root_mean_squared_error", "mae": "neg_mean_absolute_error"},
     )
     pipe.fit(X, y)
@@ -35,8 +39,8 @@ def train(data_path: Path) -> tuple[Pipeline, dict]:
     raw_intercept = ridge.intercept_ - float((raw_coef * scaler.mean_).sum())
 
     info = {
-        "model_type": "Ridge regression (StandardScaler + RidgeCV)",
-        "alpha": float(ridge.alpha_),
+        "model_type": "Ridge regression (StandardScaler + Ridge)",
+        "alpha": float(ridge.alpha),
         "intercept": raw_intercept,
         "coefficients": dict(zip(FEATURES, raw_coef.round(4).tolist())),
         "standardized_coefficients": dict(zip(FEATURES, ridge.coef_.round(2).tolist())),
@@ -67,7 +71,7 @@ def main() -> None:
     """CLI for local use: train and write the artifacts."""
     settings = get_settings()
     artifacts = settings.artifacts_dir
-    pipe, info = train(settings.data_path)
+    pipe, info = train(settings.data_path, settings.model_alpha)
     artifacts.mkdir(exist_ok=True)
     joblib.dump(pipe, artifacts / "model.joblib")
     (artifacts / "model_info.json").write_text(json.dumps(info, indent=2))

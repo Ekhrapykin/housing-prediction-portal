@@ -30,9 +30,9 @@ dir = "web"
 run = "npm run dev"
 
 [tasks."lint:web"]
-description = "Lint and typecheck the Next.js portal"
+description = "Lint, typecheck and contract-check the Next.js portal"
 dir = "web"
-run = "npm run lint && npx tsc --noEmit"
+run = "npm run lint && npx tsc --noEmit && npm run check:contracts"
 
 [tasks.test]
 description = "Run pytest in both Python services and gradle test in market-api"

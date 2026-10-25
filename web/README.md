@@ -66,17 +66,18 @@ The defaults are the compose service names, so a local `npm run dev` without `.e
 | `/estimator/compare?ids=1,2` | RSC prefetch (2-4 ids), client view | `GET /estimates?ids=` |
 | `/market?min_bedrooms=…&by=…` | server-rendered dashboard streamed in `Suspense` | `GET /summary`, `/segments`, `/properties?size=100` |
 | `/market/properties?page=&sort=` | server-rendered, 15 per page | `GET /properties` |
-| `/market/what-if` | RSC prefetch of model info, client tool | `POST /what-if` (debounced 300 ms) |
+| `/market/what-if` | RSC prefetch of model info, client tool | `POST /what-if` (debounced, `WHAT_IF_DEBOUNCE_MS`) |
 
 Proxied paths: `/api/estimator/:path*` to `${ESTIMATOR_API_URL}/:path*`, and `/api/market/:path*` to `${MARKET_API_URL}/api/market/:path*`. The CSV and PDF export links use the latter directly.
 
 ## Checks
 
-There are no unit or e2e tests in `web/`. Quality gates are lint, typecheck and a production build, the same as CI:
+There are no unit or e2e tests in `web/` (vitest is a future step). Quality gates are lint, typecheck, the contract check and a production build, the same as CI:
 
 ```bash
 npm run lint          # eslint .
 npx tsc --noEmit
+npm run check:contracts   # scripts/check-contracts.ts (tsx): zod house schema, segment/sort keys, filter parsers and what-if steps vs ../contracts
 npm run build         # needs network for fonts
 ```
 
@@ -95,9 +96,11 @@ web/
 ├── hooks/                  # use-estimates, use-model-info, use-what-if, use-market-filters, use-debounce (what-if)
 ├── lib/
 │   ├── data/               # endpoints.ts, queries.ts, server.ts, query-client.ts
-│   ├── api.ts              # browser apiFetch (10 s timeout, cancellation) + ApiError
+│   ├── api.ts              # browser apiFetch (timeout, cancellation) + ApiError
+│   ├── config.ts           # timings and tuning: stale times, revalidate, debounces, request timeout, what-if steps
 │   ├── house-schema.ts     # zod schema, field metadata, bounds
 │   ├── types.ts, format.ts, utils.ts
+├── scripts/check-contracts.ts  # npm run check:contracts
 ├── next.config.ts          # rewrites, standalone output
 └── Dockerfile
 ```

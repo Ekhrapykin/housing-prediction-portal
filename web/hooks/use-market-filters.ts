@@ -3,8 +3,7 @@
 import { debounce, useQueryStates } from "nuqs";
 import { useTransition } from "react";
 import { marketParsers } from "@/lib/data/search-params";
-
-const TYPING_DEBOUNCE_MS = 400;
+import { FILTER_DEBOUNCE_MS } from "@/lib/config";
 
 type Params = ReturnType<typeof useQueryStates<typeof marketParsers>>[0];
 
@@ -18,7 +17,7 @@ export function useMarketFilters() {
     /** Immediate update (selects). */
     set: (patch: Partial<Params>) => setParams(patch),
     /** Local state updates at once; the URL (and server render) follows after typing stops. */
-    setTyped: (patch: Partial<Params>) => setParams(patch, { limitUrlUpdates: debounce(TYPING_DEBOUNCE_MS) }),
+    setTyped: (patch: Partial<Params>) => setParams(patch, { limitUrlUpdates: debounce(FILTER_DEBOUNCE_MS) }),
     reset: () => setParams(null),
   };
 }

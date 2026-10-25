@@ -28,5 +28,11 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-tasks.withType<Test> { useJUnitPlatform() }
+tasks.withType<Test> {
+    useJUnitPlatform()
+    // ../contracts holds the shared contracts; ContractTest reads them. Declared as an input so a contract edit re-runs the tests.
+    val contracts = layout.projectDirectory.dir("../contracts")
+    inputs.dir(contracts)
+    systemProperty("contracts.dir", contracts.asFile.absolutePath)
+}
 tasks.withType<JavaCompile> { options.compilerArgs.add("-parameters") }

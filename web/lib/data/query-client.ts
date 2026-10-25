@@ -1,9 +1,10 @@
 import { defaultShouldDehydrateQuery, isServer, QueryClient } from "@tanstack/react-query";
+import { QUERY_STALE_TIME_MS } from "@/lib/config";
 
 const make = () =>
   new QueryClient({
     defaultOptions: {
-      queries: { staleTime: 30_000, retry: 1 },
+      queries: { staleTime: QUERY_STALE_TIME_MS, retry: 1 },
       dehydrate: { shouldDehydrateQuery: (q) => defaultShouldDehydrateQuery(q) || q.state.status === "pending" },
     },
   });

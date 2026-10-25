@@ -1,6 +1,6 @@
 # ml-api
 
-Task 1 of the take-home: a housing-price model behind an HTTP API. A Ridge regression is trained at startup on the 50-row dataset (`../data/house_prices.csv` in the repo root, shared with market-api) and served with FastAPI. It predicts single or batch prices, flags inputs outside the training range, and exposes the coefficients and metrics at `/model-info`. The other two backends (`estimator-api`, `market-api`) call it; nothing else does.
+Task 1 of the take-home: a housing-price model behind an HTTP API. A Ridge regression (fixed alpha 10, env `MODEL_ALPHA`) is trained at startup on the 50-row dataset (`../data/house_prices.csv` in the repo root, shared with market-api) and served with FastAPI. It predicts single or batch prices, flags inputs outside the training range, and exposes the coefficients and metrics at `/model-info`. The other two backends (`estimator-api`, `market-api`) call it; nothing else does.
 
 System context: [../README.md](../README.md). Internals: [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -47,6 +47,7 @@ Read by `app/config.py` (pydantic-settings, env var = upper-cased field name).
 | Env var | Default | Purpose |
 |---|---|---|
 | `DATA_PATH` | `../data/house_prices.csv` (repo root; `/data/house_prices.csv` in Docker) | Training CSV, read at startup (UTF-8 with BOM is handled) |
+| `MODEL_ALPHA` | `10.0` | Ridge strength. Fixed, not cross-validated. Model quality was deliberately not optimised; the task is architectural. α=10 is fixed so coefficients stay interpretable on collinear features; model selection is a future improvement |
 | `ARTIFACTS_DIR` | `ml-api/artifacts` | Only the `python -m app.ml.train` CLI writes here; the API does not read it |
 
 ## Endpoints
@@ -74,10 +75,10 @@ curl -s localhost:8000/predict -H 'content-type: application/json' -d '{
 ## Tests
 
 ```bash
-cd ml-api && uv sync && uv run pytest -q   # 7 passed
+cd ml-api && uv sync && uv run pytest -q   # 9 passed
 ```
 
-`tests/test_api.py` drives the real app, which trains on the repo's CSV in `lifespan`, through `TestClient`: health, a plausible single price (150k-450k, no warnings), batch count, empty batch and out-of-range input rejected with 422, an extrapolation warning, and `/model-info` shape. There are no unit tests for `train.py`; CI just runs pytest.
+`tests/test_api.py` drives the real app, which trains on the repo's CSV in `lifespan`, through `TestClient`: health, a plausible single price (150k-450k, no warnings), batch count, empty batch and out-of-range input rejected with 422, an extrapolation warning, and `/model-info` shape. `test_api.py` also asserts the `square_footage`, `bedrooms` and `year_built` coefficients are positive at the default alpha. `tests/test_contract.py` compares `HouseFeatures.model_json_schema()` with `contracts/house-features.schema.json`. There are no unit tests for `train.py`; CI just runs pytest.
 
 ## Layout
 
@@ -90,8 +91,8 @@ ml-api/
 │   ├── schemas.py         # HouseFeatures, Prediction, BatchPrediction
 │   ├── api/               # health.py, predictions.py, model_info.py (routers)
 │   ├── services/predictor.py  # Predictor: predict, extrapolation warnings
-│   └── ml/                # features.py (FEATURES, TARGET), train.py (train() + CLI)
-├── tests/                 # conftest.py, test_api.py
+│   └── ml/                # features.py (FEATURES, TARGET), train.py (train() + CLI; CV_FOLDS, CV_RANDOM_STATE constants)
+├── tests/                 # conftest.py, test_api.py, test_contract.py
 ├── Dockerfile             # no training, no data: both arrive at runtime
 └── pyproject.toml, uv.lock
 ```

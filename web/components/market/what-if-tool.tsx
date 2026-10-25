@@ -16,6 +16,7 @@ import { useWhatIf } from "@/hooks/use-what-if";
 import { BOUNDS, FIELDS, FIELD_LABEL, estimateSchema, houseSchema, type EstimateFormValues } from "@/lib/house-schema";
 import { featureValue, number, signedMoney } from "@/lib/format";
 import type { FeatureName, FeatureStat, HouseFeatures, ModelInfo } from "@/lib/types";
+import { WHAT_IF_STEPS } from "@/lib/config";
 
 /** Size of the "+N unit ≈ +$X" sentence per feature. */
 const DELTA: Record<FeatureName, [number, string]> = {
@@ -65,7 +66,7 @@ function WhatIf({ info }: { info: ModelInfo }) {
   const base = parsed.success ? parsed.data : null;
   const r = ranges(feature, info.feature_stats[feature]);
   const [from, to] = range;
-  const query = useWhatIf(base && from < to ? { base, feature, from, to, steps: 25 } : null);
+  const query = useWhatIf(base && from < to ? { base, feature, from, to, steps: WHAT_IF_STEPS } : null);
 
   const changeFeature = (f: FeatureName) => {
     const nr = ranges(f, info.feature_stats[f]);

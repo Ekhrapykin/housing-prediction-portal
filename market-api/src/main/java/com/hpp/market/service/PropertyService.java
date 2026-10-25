@@ -15,7 +15,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class PropertyService {
-    private static final Set<String> SORTABLE = Set.of("id", "squareFootage", "bedrooms", "bathrooms", "yearBuilt",
+    /** Sort allow-list (camelCase entity properties); contracts/market.json lists the snake_case API names. */
+    public static final Set<String> SORTABLE = Set.of("id", "squareFootage", "bedrooms", "bathrooms", "yearBuilt",
             "lotSize", "distanceToCityCenter", "schoolRating", "price");
 
     private final PropertyRepository repo;

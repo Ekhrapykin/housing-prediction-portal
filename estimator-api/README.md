@@ -49,6 +49,7 @@ Read by `app/config.py` (env var = upper-cased field name).
 |---|---|---|
 | `ML_API_URL` | `http://localhost:8000` | Base URL of ml-api |
 | `ML_API_TIMEOUT` | `5.0` | Seconds, for the pooled httpx client |
+| `ML_API_HEALTH_TIMEOUT` | `2.0` | Seconds, for the ml-api probe in `/health` (kept short so `/health` never hangs) |
 | `DATABASE_URL` | `sqlite:///estimates.db` | SQLAlchemy URL; the table is created at startup (`create_all`). In Docker the `estimator` role's `search_path` puts it in schema `estimator` |
 
 ## Endpoints
@@ -56,7 +57,7 @@ Read by `app/config.py` (env var = upper-cased field name).
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
 | POST | `/estimates` | Predict via ml-api and save | 201 with the stored estimate. Body is the 7 features plus optional `label` (max 80 chars). 422 invalid input (own validation, or ml-api's), 502 ml-api error, 503 ml-api unreachable |
-| GET | `/estimates` | List estimates | `limit` 1-500 (default 50), newest first. `ids=1,2,3` returns just those in the requested order (comparison view); unknown ids are skipped, a non-integer id is a 422 |
+| GET | `/estimates` | List estimates | `limit` 1-500 (default 50; `MAX_LIMIT` / `DEFAULT_LIMIT` in `api/estimates.py`), newest first. `ids=1,2,3` returns just those in the requested order (comparison view); unknown ids are skipped, a non-integer id is a 422 |
 | GET | `/estimates/{id}` | One estimate | 404 `{"detail":"Estimate not found"}` |
 | DELETE | `/estimates/{id}` | Remove one | 204; 404 if missing |
 | GET | `/health` | Liveness | `{"status":"ok","ml_api":"up"\|"down"}`; always 200 |
@@ -67,11 +68,12 @@ All errors have the shape `{"detail": ...}`. `detail` is a string for service er
 ## Tests
 
 ```bash
-cd estimator-api && uv sync && uv run pytest -q    # 6 passed
+cd estimator-api && uv sync && uv run pytest -q    # 8 passed
 ```
 
 - `tests/test_estimates_api.py` runs the real app against a temp-file SQLite database with a fake ML client injected through `app.dependency_overrides`. It covers create plus list, list by ids in requested order, malformed ids (422), unknown id (404), ml-api down (503), and invalid input (422 without calling ml-api).
 - `tests/test_estimate_service.py` exercises `EstimateService` with a temp-file SQLite database and the fake client, with no FastAPI at all.
+- `tests/test_contract.py` compares `HouseFeatures.model_json_schema()` with `contracts/house-features.schema.json` (names, types, bounds, required).
 - Not covered: the real `MlClient` against HTTP (status mapping is untested), `limit` bounds, DELETE 204.
 
 ## Layout
@@ -89,7 +91,7 @@ estimator-api/
 │   ├── services/estimates.py      # EstimateService (orchestration)
 │   ├── repositories/estimates.py  # EstimateRepository (SQLAlchemy queries on a Session)
 │   └── clients/ml.py      # MlClient (httpx, error translation)
-├── tests/                 # conftest.py (FakeMlClient), API and service tests
+├── tests/                 # conftest.py (FakeMlClient), API, service and contract tests
 ├── Dockerfile
 └── pyproject.toml, uv.lock
 ```

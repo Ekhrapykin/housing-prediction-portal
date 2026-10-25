@@ -34,3 +34,8 @@ def test_model_info_has_coefficients_and_metrics(client):
     body = client.get("/model-info").json()
     assert set(body["coefficients"]) == set(EXAMPLE)
     assert "cv_5fold" in body["metrics"]
+
+def test_coefficients_positive_at_default_alpha(client):
+    coef = client.get("/model-info").json()["coefficients"]
+    for name in ("square_footage", "bedrooms", "year_built"):
+        assert coef[name] > 0, f"{name} coefficient is {coef[name]}"

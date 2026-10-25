@@ -83,6 +83,7 @@ For `dev:web`, copy `web/.env.example` to `web/.env.local` so the portal points 
 | `estimator-api/` | Estimator backend (Python, SQLAlchemy) | [README](estimator-api/README.md), [ARCHITECTURE](estimator-api/ARCHITECTURE.md) |
 | `market-api/` | Market backend (Java, Spring Boot) | [README](market-api/README.md), [ARCHITECTURE](market-api/ARCHITECTURE.md) |
 | `web/` | Next.js portal | [README](web/README.md), [ARCHITECTURE](web/ARCHITECTURE.md) |
+| `contracts/` | Shared contracts (house-feature JSON Schema, market query keys) and the error contract; each service has a test that compares its native schema with them | [README](contracts/README.md) |
 | `data/` | The dataset (`house_prices.csv`, single copy) and sample inputs (`test_data.csv`) | |
 | `postgres/init/` | Init script: roles and schemas, run on first start of the Postgres volume | |
 | `.env.example` | Optional database password overrides | |
@@ -124,4 +125,4 @@ Manual deploy, from a checkout of the repo (compose bind-mounts `./data` and `./
 
 ## Model notes
 
-Ridge regression on standardised features (`RidgeCV`), 5-fold CV R2 about 0.98. Inputs outside the training range return warnings. The features are strongly collinear (pairwise correlation 0.91-0.99), so individual coefficients are unstable and some signs are counter-intuitive; see [ml-api/ARCHITECTURE.md](ml-api/ARCHITECTURE.md#known-limitations-and-next-steps).
+Ridge regression on standardised features (`Ridge`, alpha 10), 5-fold CV R2 about 0.97. Inputs outside the training range return warnings. The features are strongly collinear (pairwise correlation 0.91-0.99); see [ml-api/ARCHITECTURE.md](ml-api/ARCHITECTURE.md#data-notes). Model quality was deliberately not optimised; the task is architectural. α=10 is fixed so coefficients stay interpretable on collinear features; model selection is a future improvement.

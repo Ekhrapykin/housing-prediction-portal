@@ -73,7 +73,7 @@ SQLAlchemy 2.0 with the typed declarative style (`DeclarativeBase`, `Mapped[...]
 
 ## ml-api connection pool
 
-`lifespan` creates one `httpx.Client(base_url, timeout)` and wraps it in `MlClient` on `app.state`. Connections are reused across requests and closed on shutdown. Per-call `is_healthy()` uses a 2 s timeout so `/health` never hangs for the full 5 s. Handlers are sync, so FastAPI's threadpool provides the concurrency and the sync client is fine.
+`lifespan` creates one `httpx.Client(base_url, timeout)` and wraps it in `MlClient` on `app.state`. Connections are reused across requests and closed on shutdown. Per-call `is_healthy()` uses `ml_api_health_timeout` (2 s by default, in `Settings`) so `/health` never hangs for the full 5 s. Handlers are sync, so FastAPI's threadpool provides the concurrency and the sync client is fine.
 
 ## Testing seams
 
@@ -87,7 +87,7 @@ SQLAlchemy 2.0 with the typed declarative style (`DeclarativeBase`, `Mapped[...]
 | SQLAlchemy 2.0 ORM, not raw SQL | One codebase runs on SQLite (tests, local) and Postgres (Docker) with no SQL dialect code; the typed model is the schema. Cost: a dependency for one table. |
 | JSON text columns | Features are always read and written as a unit; no querying inside them. |
 | Session per request, commit in the dependency | One transaction per request; a failed handler rolls back. Sessions are never shared across threads. |
-| Feature schema duplicated from ml-api | `ponytail` note in `schemas.py`: extract a shared package if a third consumer appears. Fails fast without a round-trip. |
+| Feature schema duplicated from ml-api | Pinned to `contracts/house-features.schema.json` by `tests/test_contract.py`. Fails fast without a round-trip. |
 | Domain error hierarchy | Services and clients stay HTTP-agnostic; one handler owns the wire format. |
 | `/health` always 200 with `ml_api: up/down` | The service is alive even when its dependency is not; compose healthchecks stay stable. |
 

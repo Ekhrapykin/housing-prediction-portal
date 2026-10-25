@@ -4,8 +4,9 @@ from app.errors import UpstreamError, UpstreamUnavailable, UpstreamValidationErr
 
 
 class MlClient:
-    def __init__(self, http: httpx.Client):
+    def __init__(self, http: httpx.Client, health_timeout: float):
         self._http = http
+        self._health_timeout = health_timeout
 
     def predict(self, features: dict) -> dict:
         return self._request("POST", "/predict", json=features)
@@ -15,7 +16,7 @@ class MlClient:
 
     def is_healthy(self) -> bool:
         try:
-            return self._http.get("/health", timeout=2).is_success
+            return self._http.get("/health", timeout=self._health_timeout).is_success
         except httpx.HTTPError:
             return False
 

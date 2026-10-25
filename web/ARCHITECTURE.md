@@ -26,6 +26,7 @@ flowchart TB
 | Hooks | `hooks/` | Thin wrappers over `queries.ts` and mutations; URL state in `use-market-filters`. |
 | Data | `lib/data/` | The only code that knows backend paths, query keys and cache policy. |
 | Schemas/format | `lib/house-schema.ts`, `lib/format.ts`, `lib/types.ts` | Shared by forms and display. |
+| Config | `lib/config.ts` | Timings and tuning (stale times, revalidate, debounces, request timeout, what-if steps), one named constant each. Page sizes stay beside their loaders in `data/server.ts`. |
 
 ### Server vs client components
 
@@ -116,12 +117,12 @@ Market filters, segment (`by`), sort and page live in the query string. URL stat
 | Market app server-rendered from the URL | Shareable views, no client state to sync, and the cache can sit at the fetch layer. |
 | `Result<T>` instead of throwing | Partial failure per region and readable messages in production. |
 | Query keys only in `queries.ts` | Prefetch, hooks and invalidation share one source. |
-| zod bounds mirror the backends | Instant field errors without a round-trip. |
+| zod bounds mirror the backends | Instant field errors without a round-trip. `scripts/check-contracts.ts` compares them with `contracts/` (also segment/sort keys, filter parsers, what-if steps) in `mise run lint:web` and CI. |
 
 ## Known limitations and next steps
 
 - No automated tests (unit or e2e); lint, `tsc` and `next build` are the only gates.
-- The `market` fetch tag is never revalidated (no `revalidateTag` call); entries expire after 300 s.
+- The `market` fetch tag is reserved for an on-demand `revalidateTag("market")` once on-the-fly retraining or data reloads exist (see "Future improvements" in the root [ARCHITECTURE.md](../ARCHITECTURE.md)). No code calls it yet; the data is static and the 300 s revalidate covers it.
 - The scatter plot fetches up to 100 properties, which covers the 50-row dataset only.
 - A 422 from the estimator carries a list `detail`, which the UI shows as `Request failed (422)`; client-side zod validation normally prevents it.
 - Backend URLs are baked into the image at build time; changing them needs a rebuild.

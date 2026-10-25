@@ -2,6 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import type { Estimate, ModelInfo, WhatIfPoint } from "@/lib/types";
 import { ESTIMATOR_BASE, MARKET_BASE, paths } from "./endpoints";
+import { MODEL_INFO_STALE_TIME_MS } from "@/lib/config";
 
 /** The only place query keys exist; hooks, server prefetch and invalidation all go through here. */
 export const queries = {
@@ -21,7 +22,7 @@ export const queries = {
     queryOptions({
       queryKey: ["model-info"],
       queryFn: ({ signal }) => apiFetch<ModelInfo>(ESTIMATOR_BASE + paths.estimator.modelInfo, { signal }),
-      staleTime: 10 * 60_000,
+      staleTime: MODEL_INFO_STALE_TIME_MS,
     }),
   /** `body` is the serialized WhatIfParams (a string has stable identity); null disables the query. */
   whatIf: (body: string | null) =>

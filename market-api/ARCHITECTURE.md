@@ -59,7 +59,6 @@ sequenceDiagram
 | Exception | Status | Source |
 |---|---|---|
 | `BadRequestException` | 400 | unknown sort property or what-if feature; ml-api answered 400/422 |
-| `NotFoundException` | 404 | defined, not used by current endpoints |
 | `UpstreamErrorException` | 502 | ml-api 5xx or a malformed/mismatched response |
 | `UpstreamUnavailableException` | 503 | connect/read timeout or connection failure |
 | `MethodArgumentNotValidException` | 400 | request-body validation; `detail` is `field message; ...` |
@@ -90,7 +89,7 @@ Value-based record keys mean two requests with the same parameters hit the same 
 
 ## ml-api client
 
-`MlClient` uses a Spring `RestClient` built in `AppConfig` on the JDK `HttpClient` with timeouts of 2 s (connect) and 5 s (read). It is forced to HTTP/1.1: the JDK client defaults to attempting an h2c upgrade on cleartext connections and uvicorn rejects that request. It sends one `POST /predict/batch` per what-if and checks that the response has one prediction per input, in order.
+`MlClient` uses a Spring `RestClient` built in `AppConfig` on the JDK `HttpClient` with timeouts from `MlProperties` (`ml.api.connect-timeout` 2 s, `ml.api.read-timeout` 5 s by default). It is forced to HTTP/1.1: the JDK client defaults to attempting an h2c upgrade on cleartext connections and uvicorn rejects that request. It sends one `POST /predict/batch` per what-if and checks that the response has one prediction per input, in order.
 
 ## Exports
 
@@ -108,7 +107,7 @@ Value-based record keys mean two requests with the same parameters hit the same 
 | RestClient forced to HTTP/1.1 | Avoids the h2c upgrade uvicorn rejects. |
 | `ProblemDetail` with `detail` | Spring's native error type, and it satisfies the cross-service `{detail}` contract. |
 | Virtual threads | Request threads are cheap while blocked on ml-api. |
-| Bounds mirrored in `HouseFeatures` | Fails fast with a 400 before spending a round-trip. |
+| Bounds mirrored in `HouseFeatures` | Fails fast with a 400 before spending a round-trip. `ContractTest` checks them against `contracts/house-features.schema.json`. |
 
 ## Known limitations and next steps
 
@@ -116,5 +115,3 @@ Value-based record keys mean two requests with the same parameters hit the same 
 - The CSV is duplicated with ml-api. A shared read-only `housing` schema would remove the copy (root [ARCHITECTURE.md](../ARCHITECTURE.md)).
 - No tests for exports or cache behaviour; no test hits a real ml-api.
 - Validation errors from nested objects report Java field paths (for example `base.squareFootage`) rather than snake_case names.
-- What-if curves inherit ml-api's collinearity problem: because the model's coefficients are unstable, the price can slope down as square footage rises ([../ml-api/ARCHITECTURE.md](../ml-api/ARCHITECTURE.md)).
-- `NotFoundException` is unused.

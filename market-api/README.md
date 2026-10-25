@@ -51,10 +51,12 @@ Multi-stage build: JDK image runs `./gradlew bootJar`, the runtime is `eclipse-t
 | `data.path` | `DATA_PATH` | `../data/house_prices.csv` | Seed CSV (`/data/house_prices.csv` in Docker); UTF-8 BOM handled |
 | `spring.datasource.*` | `DATABASE_URL`, `MARKET_DB_PASSWORD` | H2 in-memory | `docker` profile only (`application-docker.yml`) |
 | `server.port` | | `8080` | |
+| `ml.api.connect-timeout` | | `2s` | ml-api connect timeout (`MlProperties`) |
+| `ml.api.read-timeout` | | `5s` | ml-api read timeout (`MlProperties`) |
 | `spring.cache.caffeine.spec` | | `maximumSize=500,expireAfterWrite=10m` | Applies to every cache |
 | `spring.data.web.pageable.max-page-size` | | `200` | Upper bound for `size` |
 
-Hard-coded in `AppConfig`: ml-api connect timeout 2 s, read timeout 5 s. Spring's relaxed binding lets any `application.yml` key be overridden by env var.
+Spring's relaxed binding lets any `application.yml` key be overridden by env var (for example `ML_API_READ_TIMEOUT=10s`).
 
 ## Endpoints
 
@@ -87,6 +89,7 @@ cd market-api && ./gradlew test        # or: mise exec -- ./gradlew test -q
 | `PropertyRepositoryTest` (`@DataJpaTest`) | CSV seed loads 50 rows; a Specification narrows results |
 | `MarketControllerTest` (`@WebMvcTest`, services mocked) | summary happy path, bad `by` is 400, unknown what-if feature is 400 with `detail`, `steps` out of range is 400 |
 | `MlClientTest` (`MockRestServiceServer`) | prices returned in order; 5xx becomes `UpstreamErrorException` |
+| `ContractTest` | `HouseFeatures` annotations vs `contracts/house-features.schema.json`; `Segment`, sort allow-list, `MarketFilter` params and `WhatIfRequest.steps` vs `contracts/market.json`. Gradle passes the `../contracts` path as `contracts.dir` and tracks it as a test input |
 | `MarketApplicationTests` (full context, MockMvc) | `/summary` over the real seed |
 
 Not covered: exports, caching behaviour, the HTTP/1.1 client against a live uvicorn.

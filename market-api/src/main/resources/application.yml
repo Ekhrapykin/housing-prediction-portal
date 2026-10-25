@@ -1,5 +1,8 @@
 server.port: 8080
-ml.api.url: ${ML_API_URL:http://localhost:8000}
+ml.api:
+  url: ${ML_API_URL:http://localhost:8000}
+  connect-timeout: 2s
+  read-timeout: 5s
 data.path: ${DATA_PATH:../data/house_prices.csv} # DATA_PATH=/data/house_prices.csv in Docker
 spring:
   application.name: market-api

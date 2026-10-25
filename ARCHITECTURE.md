@@ -50,18 +50,19 @@ Rules:
 | JSON naming | snake_case everywhere. Python models use snake_case fields; market-api sets `spring.jackson.property-naming-strategy: SNAKE_CASE` and binds snake_case query params with `@BindParam`. |
 | Errors | Non-2xx responses carry `{"detail": ...}`. estimator-api uses an `AppError` handler; market-api returns `ProblemDetail` (which has `detail`); ml-api uses FastAPI defaults. `detail` is a string, except FastAPI validation 422s, where it is a list of issues; the portal's `apiFetch` turns that list into a readable `field: message` string. Validation status differs: 422 in Python, 400 in Java. |
 | Health | ml-api and estimator-api `GET /health`, market-api `GET /actuator/health`, web `GET /`, postgres `pg_isready`. Compose healthchecks and `depends_on: service_healthy` order startup: postgres and ml-api, then the two app backends, then web. |
-| Feature schema | The 7 features with identical bounds are defined in four places (below). |
+| Feature schema | The 7 features with identical bounds are defined in four places, pinned to [`contracts/`](contracts/README.md) by contract tests (below). |
 
-### The 7-feature schema, mirrored four times
+### The 7-feature schema, mirrored four times, pinned by `contracts/`
 
 | Copy | File | Role |
 |---|---|---|
-| Source of truth | `ml-api/app/schemas.py` (+ `app/ml/features.py`) | What the model accepts |
+| Contract | `contracts/house-features.schema.json` (+ `contracts/market.json` for market query keys) | The agreed names, types and bounds |
+| Native: ml-api | `ml-api/app/schemas.py` (+ `app/ml/features.py`) | What the model accepts |
 | estimator-api | `estimator-api/app/schemas.py` | Validate before calling ml-api |
 | market-api | `market-api/.../dto/HouseFeatures.java` | Validate the what-if base house |
 | web | `web/lib/house-schema.ts` (zod), `web/lib/types.ts` | Instant form errors, typed UI |
 
-Why mirror instead of share: three languages and four deployables; a shared package or codegen from ml-api's OpenAPI would be more machinery than a 7-field schema that hasn't changed. Each copy fails fast at its own boundary, and ml-api still validates last. The comments in each copy point back to ml-api. The trigger to change this is a schema change or a fifth consumer: generate clients from ml-api's OpenAPI.
+Why mirror instead of share: three languages and four deployables; a shared package or codegen would be more machinery than a 7-field schema that hasn't changed. Each copy fails fast at its own boundary, and ml-api still validates last. Drift is caught by one contract test per service (`ml-api` and `estimator-api` `tests/test_contract.py`, market-api `ContractTest`, web `npm run check:contracts`), all comparing the native schema with the files in `contracts/`. To change a bound: edit the contract first, then every mirror. Contracts are only read by tests, so no Docker image needs them. The trigger to go further is a fifth consumer: generate clients from ml-api's OpenAPI.
 
 ## Flow: create an estimate
 
@@ -162,7 +163,7 @@ flowchart LR
 
 **Training at startup from a mounted CSV.** `data/house_prices.csv` exists once in the repo and is bind-mounted read-only into ml-api (training) and market-api (seed), instead of being copied into two images. ml-api trains in `lifespan` (about a second, deterministic because the CV split has a fixed seed), so changing the data needs a restart, not a rebuild, and CI tests the same code path the service runs. A bind mount, not a named volume, so the file comes from the checkout that the Pi deploy job already has. Cost: the image alone is not a model, startup is slightly slower (compose `start_period` is 30 s), and there is still no model registry.
 
-**Ridge over OLS or boosting.** With 50 rows and features correlated at 0.91-0.99, OLS coefficients are unstable, and boosting would overfit and lose the linear explanation the portal shows (contribution = coefficient x distance from mean). Ridge regularises and stays explainable. Cost: the alpha picked by `RidgeCV` is small, so coefficients are still unstable (see limitations).
+**Ridge over OLS or boosting.** With 50 rows and features correlated at 0.91-0.99, OLS coefficients are unstable, and boosting would overfit and lose the linear explanation the portal shows (contribution = coefficient x distance from mean). Ridge regularises and stays explainable. Alpha is fixed at 10 (`MODEL_ALPHA`) rather than cross-validated: the CV-picked alpha was tiny and left some coefficients with implausible signs. Cost: about 0.01 of CV R2 (0.973). Model quality was deliberately not optimised; the task is architectural. α=10 is fixed so coefficients stay interpretable on collinear features; model selection is a future improvement.
 
 **Rewrites instead of route handlers.** `next.config.ts` rewrites proxy `/api/*` with no code, keep one origin (no CORS), and keep backends private. Cost: destinations are fixed at build time, so the URLs are build args, and the proxy can't reshape errors.
 
@@ -172,15 +173,18 @@ flowchart LR
 
 ## Known limitations and next steps
 
-- **Model coefficients are unstable.** The features are highly collinear, so single-feature coefficients have implausible signs (currently `square_footage`, `bedrooms` and `year_built` negative). Predictions are accurate, but the what-if curve can slope down as square footage rises, and the per-feature breakdown inherits the same problem. A larger fixed alpha trades a little R2 for sensible signs.
-- **Schema duplicated four times**; generate clients from ml-api's OpenAPI if it changes.
+- **Collinear features.** The features correlate 0.91-0.99, so single-feature coefficients are not individually identifiable even though all are positive at alpha 10. Model quality was deliberately not optimised; the task is architectural. α=10 is fixed so coefficients stay interpretable on collinear features; model selection is a future improvement. See the data notes in [ml-api/ARCHITECTURE.md](ml-api/ARCHITECTURE.md#data-notes).
+- **Schema duplicated four times**, with drift caught by the contract tests in `contracts/`; generate clients from ml-api's OpenAPI if it changes.
 - **Error contract is not uniform:** 400 vs 422 for validation, and FastAPI 422 `detail` is a list (the portal normalises it, other clients must handle both).
 - **No auth;** the estimate history is shared by everyone.
-- **No e2e tests,** and none of the portal's code is unit-tested.
+- **No e2e tests,** and the portal has only the contract check, no unit tests.
 - **Single host, no TLS termination of its own;** relies on the tunnel.
 
 ## Future improvements
 
+- **Model selection.** Alpha is fixed at 10 and model quality was not optimised. Compare alphas, feature subsets and other models with nested CV, and add VIF to `/model-info`.
+- **Vitest for the web.** Move the contract check (`web/scripts/check-contracts.ts`) into a vitest suite and add unit tests for the zod schema, `apiFetch` and the URL parsers.
+- **Generated web types.** Generate the web's response types from the backends' OpenAPI (`openapi-typescript`) instead of the hand-written `lib/types.ts`.
 - **On-the-fly retraining.** `POST /admin/retrain` in ml-api reads the (new) CSV, validates it (columns, ranges, row count), trains, and swaps the in-memory model only if the CV metrics pass a threshold (for example R2 not below the current model's minus a tolerance). A `model_runs` table would log every attempt with metrics, data hash and outcome, which also gives the model versioning ml-api lacks today.
 - **Migrations.** Alembic for estimator-api and Flyway for market-api once a column has to change on live data; `create_all` and `ddl-auto: create` only handle the first creation.
 - **Testcontainers for Postgres.** Run the repository and JPA tests against a real Postgres, so SQLite/H2 portability is checked, including the per-role schemas.
