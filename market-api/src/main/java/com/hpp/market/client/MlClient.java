@@ -1,19 +1,17 @@
 package com.hpp.market.client;
 
-import com.hpp.market.exception.BadRequestException;
-import com.hpp.market.exception.UpstreamErrorException;
-import com.hpp.market.exception.UpstreamUnavailableException;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.server.ResponseStatusException;
 
 @Component
 public class MlClient {
     record Prediction(double price, List<String> warnings) {}
-    record BatchPrediction(int count, List<Prediction> predictions) {}
+    record BatchPrediction(List<Prediction> predictions) {}
 
     private final RestClient http;
 
@@ -27,16 +25,16 @@ public class MlClient {
         try {
             res = http.post().uri("/predict/batch").body(features).retrieve().body(BatchPrediction.class);
         } catch (ResourceAccessException e) {
-            throw new UpstreamUnavailableException("Prediction service is unavailable");
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Prediction service is unavailable");
         } catch (RestClientResponseException e) {
             if (e.getStatusCode().isSameCodeAs(HttpStatus.UNPROCESSABLE_ENTITY)
                     || e.getStatusCode().isSameCodeAs(HttpStatus.BAD_REQUEST)) {
-                throw new BadRequestException("Prediction service rejected the input");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Prediction service rejected the input");
             }
-            throw new UpstreamErrorException("Prediction service returned an error");
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Prediction service returned an error");
         }
         if (res == null || res.predictions() == null || res.predictions().size() != features.size()) {
-            throw new UpstreamErrorException("Prediction service returned an error");
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Prediction service returned an error");
         }
         return res.predictions().stream().map(Prediction::price).toList();
     }

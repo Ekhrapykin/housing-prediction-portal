@@ -9,7 +9,6 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.hpp.market.config.RequestIdInterceptor;
-import com.hpp.market.exception.UpstreamErrorException;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,9 +16,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.server.ResponseStatusException;
 
 class MlClientTest {
     MockRestServiceServer server;
@@ -45,7 +46,8 @@ class MlClientTest {
     void upstream5xxBecomesUpstreamError() {
         server.expect(requestTo("http://ml/predict/batch")).andRespond(withServerError());
         assertThatThrownBy(() -> client.predictBatch(List.of(Map.of("a", 1))))
-                .isInstanceOf(UpstreamErrorException.class);
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
     }
 
     @AfterEach

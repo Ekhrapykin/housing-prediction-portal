@@ -47,7 +47,7 @@ Multi-stage build: JDK image runs `./gradlew bootJar`, the runtime is `eclipse-t
 
 | Setting | Env var | Default | Purpose |
 |---|---|---|---|
-| `ml.api.url` | `ML_API_URL` | `http://localhost:8000` | ml-api base URL (blank falls back to the default) |
+| `ml.api.url` | `ML_API_URL` | `http://localhost:8000` | ml-api base URL |
 | `data.path` | `DATA_PATH` | `../data/house_prices.csv` | Dataset CSV (`/data/house_prices.csv` in Docker); UTF-8 BOM handled |
 | `market.sync-on-startup` | `MARKET_SYNC_ON_STARTUP` | `true` | Reload the market table from the CSV on start; turn off once migrations own the data |
 | `spring.datasource.*` | `DATABASE_URL`, `MARKET_DB_PASSWORD` | H2 in-memory | `docker` profile only (`application-docker.yml`) |
@@ -90,7 +90,7 @@ cd market-api && ./gradlew test        # or: mise exec -- ./gradlew test -q
 |---|---|
 | `PropertyRepositoryTest` (`@DataJpaTest`) | CSV seed loads 50 rows; a Specification narrows results |
 | `MarketControllerTest` (`@WebMvcTest`, services mocked) | summary happy path, bad `by` is 400, unknown what-if feature is 400 with `detail`, `steps` out of range is 400, an invalid nested field is reported with a snake_case path (`base.square_footage`) |
-| `MlClientTest` (`MockRestServiceServer`) | prices returned in order; 5xx becomes `UpstreamErrorException` |
+| `MlClientTest` (`MockRestServiceServer`) | prices returned in order; 5xx becomes a 502 `ResponseStatusException` |
 | `ContractTest` | `HouseFeatures` annotations vs `contracts/house-features.schema.json`; `Segment`, sort allow-list, `MarketFilter` params and `WhatIfRequest.steps` vs `contracts/market.json`. Gradle passes the `../contracts` path as `contracts.dir` and tracks it as a test input |
 | `MarketApplicationTests` (full context, MockMvc) | `/summary` over the real seed |
 
@@ -114,7 +114,7 @@ market-api/
     │   ├── dto/           # records: HouseFeatures, MarketFilter, WhatIfRequest, ...
     │   ├── config/        # AppConfig, MlProperties, RequestIdInterceptor
     │   ├── ingest/        # CsvPropertySync (CSV → market table on start)
-    │   └── exception/     # ApiException hierarchy, ApiExceptionHandler
+    │   └── exception/     # ApiExceptionHandler (validation errors as ProblemDetail)
     ├── main/resources/    # application.yml, application-docker.yml
     └── test/java/...      # see Tests
 ```

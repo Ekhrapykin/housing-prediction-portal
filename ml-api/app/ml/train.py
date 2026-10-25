@@ -1,8 +1,6 @@
-import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-import joblib
 import pandas as pd
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, r2_score, root_mean_squared_error
@@ -10,9 +8,11 @@ from sklearn.model_selection import KFold, cross_validate
 from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from app.config import get_settings
-from app.ml.features import FEATURES, TARGET
+from app.schemas import HouseFeatures
 
+
+FEATURES = list(HouseFeatures.model_fields)
+TARGET = "price"
 
 # Fixed modelling decisions (alpha is config: Settings.model_alpha). See the Ridge decision in ARCHITECTURE.md.
 CV_FOLDS = 5  # 50 rows: 5 folds leave 10 rows per test fold
@@ -65,18 +65,3 @@ def train(data_path: Path, alpha: float) -> tuple[Pipeline, dict]:
     }
 
     return pipe, info
-
-
-def main() -> None:
-    """CLI for local use: train and write the artifacts."""
-    settings = get_settings()
-    artifacts = settings.artifacts_dir
-    pipe, info = train(settings.data_path, settings.model_alpha)
-    artifacts.mkdir(exist_ok=True)
-    joblib.dump(pipe, artifacts / "model.joblib")
-    (artifacts / "model_info.json").write_text(json.dumps(info, indent=2))
-    print(json.dumps(info["metrics"], indent=2))
-
-
-if __name__ == "__main__":
-    main()

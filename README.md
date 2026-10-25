@@ -62,7 +62,7 @@ Against the task PDF ("Interview Tasks Fullstack"), paraphrased. "Partial" rows 
 | App Router; server and client components used appropriately | RSC pages and loaders; client components only for forms, charts, tables, filters | Done |
 | RSC for initial data loading | `web/lib/data/server.ts` loaders and TanStack Query prefetch/hydration | Done |
 | Data fetching strategy | server loaders (market), TanStack Query (estimator, what-if), rewrites as same-origin proxy | Done |
-| Custom hooks for shared functionality | `web/hooks/` (`use-estimates`, `use-model-info`, `use-what-if`, `use-market-filters`, `use-debounce`) | Done |
+| Custom hooks for shared functionality | `web/hooks/` (`use-estimates`, `use-what-if`, `use-market-filters`, `use-debounce`) | Done |
 | Responsive layouts with Tailwind | Tailwind 4 utility classes throughout | Done, checked by eye, no device matrix |
 | Accessible components following WCAG | Skip link, landmarks, labelled fields and sliders, `aria-live` errors, `sr-only` chart tables, reduced-motion support (see [web/ARCHITECTURE.md](web/ARCHITECTURE.md#accessibility)) | Partial: basic measures, no formal audit |
 | Loading states and error boundaries | skeletons, `loading.tsx`, route and global error boundaries, inline `ErrorState` | Done |

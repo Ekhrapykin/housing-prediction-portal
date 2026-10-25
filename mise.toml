@@ -4,11 +4,6 @@ uv = "latest"
 java = "temurin-21"
 node = "26"
 
-[tasks.train]
-description = "Train the ml-api model and write artifacts (the API itself trains at startup)"
-dir = "ml-api"
-run = "uv run python -m app.ml.train"
-
 [tasks."dev:ml"]
 description = "Run ml-api on :8000"
 dir = "ml-api"

@@ -7,8 +7,6 @@ export const MODEL_INFO_STALE_TIME_MS = 10 * 60_000;
 
 /** Server-side market reads are cached 5 min; the dataset is static while the app runs. */
 export const MARKET_REVALIDATE_S = 300;
-// Reserved for an on-demand revalidateTag("market") once retraining or data reloads exist; nothing calls it yet.
-export const MARKET_CACHE_TAG = "market";
 
 /** Wait for the slider to settle before calling market-api. */
 export const WHAT_IF_DEBOUNCE_MS = 300;

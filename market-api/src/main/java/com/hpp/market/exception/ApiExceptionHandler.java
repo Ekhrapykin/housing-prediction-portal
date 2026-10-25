@@ -9,7 +9,6 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
@@ -17,11 +16,6 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 /** Every error is a ProblemDetail with a `detail` field, like the Python services. */
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
-
-    @ExceptionHandler(ApiException.class)
-    ProblemDetail handle(ApiException e) {
-        return ProblemDetail.forStatusAndDetail(e.status(), e.getMessage());
-    }
 
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(

@@ -8,7 +8,7 @@ import { filtersQuery, paths } from "./endpoints";
 import { queries } from "./queries";
 import { loadSearchParams } from "./search-params";
 import { REQUEST_ID_HEADER } from "@/lib/api";
-import { MARKET_CACHE_TAG, MARKET_REVALIDATE_S } from "@/lib/config";
+import { MARKET_REVALIDATE_S } from "@/lib/config";
 import { ESTIMATOR_API_URL as ESTIMATOR, MARKET_API_URL as MARKET } from "@/lib/backends";
 
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -32,7 +32,7 @@ async function request<T>(service: string, url: string, init: RequestInit): Prom
 // Only the uncached estimator reads carry a fresh request id: Next puts request headers in the fetch cache key,
 // so a per-request id on the market reads would turn every one of them into a cache miss.
 const market = <T>(path: string, sp: URLSearchParams) =>
-  request<T>("market", `${MARKET}/api/market${path}?${sp}`, { next: { revalidate: MARKET_REVALIDATE_S, tags: [MARKET_CACHE_TAG] } });
+  request<T>("market", `${MARKET}/api/market${path}?${sp}`, { next: { revalidate: MARKET_REVALIDATE_S } });
 const estimator = <T>(path: string) =>
   request<T>("estimator", `${ESTIMATOR}${path}`, { cache: "no-store", headers: { [REQUEST_ID_HEADER]: crypto.randomUUID() } });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { ErrorState } from "@/components/error-state";
@@ -11,8 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
-import { useModelInfo } from "@/hooks/use-model-info";
 import { useWhatIf } from "@/hooks/use-what-if";
+import { queries } from "@/lib/data/queries";
 import { BOUNDS, FIELDS, FIELD_LABEL, estimateSchema, houseSchema, type EstimateFormValues } from "@/lib/house-schema";
 import { featureValue, number, signedMoney } from "@/lib/format";
 import type { FeatureName, FeatureStat, HouseFeatures, ModelInfo } from "@/lib/types";
@@ -155,7 +156,7 @@ function WhatIf({ info }: { info: ModelInfo }) {
 }
 
 export function WhatIfTool() {
-  const { data, isPending, isError, error, refetch } = useModelInfo();
+  const { data, isPending, isError, error, refetch } = useQuery(queries.modelInfo());
   if (isPending) return <Skeleton className="h-96 w-full" />;
   if (isError) return <ErrorState title="What-if is unavailable" message={error.message} onRetry={() => refetch()} />;
   return <WhatIf info={data} />;

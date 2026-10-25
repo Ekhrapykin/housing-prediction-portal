@@ -4,14 +4,15 @@ import com.hpp.market.domain.Property;
 import com.hpp.market.dto.MarketFilter;
 import com.hpp.market.dto.PageResponse;
 import com.hpp.market.dto.PropertyDto;
-import com.hpp.market.exception.BadRequestException;
 import com.hpp.market.repository.PropertyRepository;
 import com.hpp.market.repository.PropertySpecifications;
 import java.util.List;
 import java.util.Set;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class PropertyService {
@@ -29,7 +30,7 @@ public class PropertyService {
         // accept snake_case sort keys (square_footage) like everywhere else in the API
         Sort sort = Sort.by(pageable.getSort().stream().map(o -> {
             String prop = camel(o.getProperty());
-            if (!SORTABLE.contains(prop)) throw new BadRequestException("Unknown sort property: " + o.getProperty());
+            if (!SORTABLE.contains(prop)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown sort property: " + o.getProperty());
             return o.withProperty(prop);
         }).toList());
         var page = repo.findAll(PropertySpecifications.from(f),

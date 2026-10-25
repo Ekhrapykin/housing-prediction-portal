@@ -97,7 +97,7 @@ web/
 │   ├── market/             # dashboard, filters, segment-chart, price-scatter, properties-table, what-if-*, export-buttons
 │   ├── ui/                 # shadcn primitives
 │   └── *.tsx               # nav, sub-nav, house-fields, error-state, route-error, skeletons
-├── hooks/                  # use-estimates, use-model-info, use-what-if, use-market-filters, use-debounce (what-if)
+├── hooks/                  # use-estimates, use-what-if, use-market-filters, use-debounce (what-if)
 ├── lib/
 │   ├── data/               # endpoints.ts, queries.ts, server.ts, query-client.ts
 │   ├── api.ts              # browser apiFetch (timeout, cancellation) + ApiError

@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ErrorState } from "@/components/error-state";
@@ -7,14 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useEstimatesByIds } from "@/hooks/use-estimates";
+import { queries } from "@/lib/data/queries";
 import { FIELDS } from "@/lib/house-schema";
 import { featureValue, money, priceTicks } from "@/lib/format";
 import type { Estimate } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function CompareView({ ids }: { ids: number[] }) {
-  const { data, isPending, isError, error, refetch } = useEstimatesByIds(ids);
+  const { data, isPending, isError, error, refetch } = useQuery(queries.estimatesByIds(ids));
 
   if (ids.length < 2)
     return (

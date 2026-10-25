@@ -10,7 +10,6 @@ flowchart LR
   L[lifespan] --> T[ml/train.py: train]
   T --> CSV[(DATA_PATH<br/>/data/house_prices.csv, mounted)]
   L -->|Predictor| S
-  T -.CLI only.-> A[(artifacts/)]
 ```
 
 | Layer | Module | Rule |
@@ -20,7 +19,7 @@ flowchart LR
 | Service | `app/services/predictor.py` | `Predictor` wraps the fitted pipeline and the model card; builds the DataFrame, predicts, computes warnings. Knows nothing about HTTP. |
 | Deps | `app/deps.py` | Hands the predictor from `app.state` to routes (`PredictorDep`). |
 | Config | `app/config.py` | `Settings` via pydantic-settings, cached with `lru_cache`. |
-| ML | `app/ml/` | `features.py` is the single list of feature names and the target; `train.py` has `train(data_path)`, which `lifespan` calls at startup, and a CLI `main()` for local use. |
+| ML | `app/ml/` | `train.py` has `train(data_path)`, which `lifespan` calls at startup, plus the feature list (derived from `HouseFeatures`) and the target. |
 
 There is no repository layer: the only input is one read-only CSV.
 
@@ -44,12 +43,12 @@ sequenceDiagram
 
 ## Model and training
 
-`train(data_path, alpha)` (called by `lifespan`; `python -m app.ml.train` wraps it for local use) does the following:
+`train(data_path, alpha)` (called by `lifespan`) does the following:
 
 1. Reads the CSV with `encoding="utf-8-sig"` (the file starts with a BOM).
 2. Builds `make_pipeline(StandardScaler(), Ridge(alpha=settings.model_alpha))`.
 3. Runs 5-fold CV (`KFold(CV_FOLDS, shuffle=True, random_state=CV_RANDOM_STATE)`) for R2, RMSE, MAE, then fits on all 50 rows.
-4. Returns the fitted pipeline and the model card. Only the CLI writes `model.joblib` and `model_info.json`; the service keeps both in memory.
+4. Returns the fitted pipeline and the model card. The service keeps both in memory.
 
 The model card (served at `/model-info`) holds two views of the coefficients. `coefficients` are in raw units (`ridge.coef_ / scaler.scale_`, with the intercept shifted to match), which the portal multiplies by `(value - mean)` for the per-feature breakdown. `standardized_coefficients` are per standard deviation and comparable across features. It also stores CV and train metrics and `feature_stats`, which the API reuses for warnings and the portal for default ranges.
 
@@ -59,7 +58,7 @@ Model quality was deliberately not optimised; the task is architectural. α=10 i
 
 ## Lifespan and statelessness
 
-`lifespan` trains once at startup (about a second on 50 rows) and puts the `Predictor` into `app.state.predictor`. Requests share a read-only model, so there is no locking and no per-request disk I/O. If the CSV is missing or malformed, startup fails loudly rather than serving 500s. Compose gives the healthcheck a 30 s start period for this. `GET /health` reports `model_loaded`, which is always true once the app is up.
+`lifespan` trains once at startup (about a second on 50 rows) and puts the `Predictor` into `app.state.predictor`. Requests share a read-only model, so there is no locking and no per-request disk I/O. If the CSV is missing or malformed, startup fails loudly rather than serving 500s. Compose gives the healthcheck a 30 s start period for this. `GET /health` is therefore a plain `{"status":"ok"}`.
 
 ## Errors
 
@@ -71,7 +70,7 @@ ml-api registers no custom handler. FastAPI's default 422 body is `{"detail": [ 
 
 ## Data and persistence
 
-No database. The training CSV is the single copy at the repo root (`data/house_prices.csv`), bind-mounted read-only at `/data` in Docker and read via `DATA_PATH`. Nothing is written at runtime; `artifacts/` is only produced by the optional CLI and is git-ignored.
+No database. The training CSV is the single copy at the repo root (`data/house_prices.csv`), bind-mounted read-only at `/data` in Docker and read via `DATA_PATH`. Nothing is written at runtime.
 
 ## Key decisions
 

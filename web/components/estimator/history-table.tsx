@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -9,12 +10,13 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useDeleteEstimate, useEstimates } from "@/hooks/use-estimates";
+import { useDeleteEstimate } from "@/hooks/use-estimates";
 import { errorMessage } from "@/lib/api";
+import { queries } from "@/lib/data/queries";
 import { date, money, number } from "@/lib/format";
 
 export function HistoryTable() {
-  const { data, isPending, isError, error, refetch } = useEstimates();
+  const { data, isPending, isError, error, refetch } = useQuery(queries.estimates());
   const del = useDeleteEstimate();
   const [selected, setSelected] = useState<number[]>([]);
 

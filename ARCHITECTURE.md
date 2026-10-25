@@ -57,7 +57,7 @@ Rules:
 | Copy | File | Role |
 |---|---|---|
 | Contract | `contracts/house-features.schema.json` (+ `contracts/market.json` for market query keys) | The agreed names, types and bounds |
-| Native: ml-api | `ml-api/app/schemas.py` (+ `app/ml/features.py`) | What the model accepts |
+| Native: ml-api | `ml-api/app/schemas.py` | What the model accepts |
 | estimator-api | `estimator-api/app/schemas.py` | Validate before calling ml-api |
 | market-api | `market-api/.../dto/HouseFeatures.java` | Validate the what-if base house |
 | web | `web/lib/house-schema.ts` (zod), `web/lib/types.ts` | Instant form errors, typed UI |

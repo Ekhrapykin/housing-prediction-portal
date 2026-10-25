@@ -1,16 +1,12 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { ESTIMATOR_BASE, paths } from "@/lib/data/endpoints";
 import { queries } from "@/lib/data/queries";
 import type { Estimate, HouseFeatures } from "@/lib/types";
 
 export type EstimateInput = HouseFeatures & { label?: string | null };
-
-export const useEstimates = () => useQuery(queries.estimates());
-
-export const useEstimatesByIds = (ids: number[]) => useQuery(queries.estimatesByIds(ids));
 
 export function useCreateEstimate() {
   const qc = useQueryClient();

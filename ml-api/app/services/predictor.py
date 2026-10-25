@@ -1,6 +1,6 @@
 import pandas as pd
 
-from app.ml.features import FEATURES
+from app.ml.train import FEATURES
 from app.schemas import HouseFeatures, Prediction
 
 

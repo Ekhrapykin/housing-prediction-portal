@@ -11,16 +11,15 @@ System context: [../README.md](../README.md). Internals: [ARCHITECTURE.md](ARCHI
 | Python | 3.14 (`.python-version`, `requires-python >=3.14`) |
 | Packaging | uv, `uv.lock` committed |
 | API | FastAPI >=0.162, uvicorn[standard] >=0.54, pydantic-settings >=2.16 |
-| ML | scikit-learn >=1.9.1, pandas >=3.1, joblib >=1.6 |
+| ML | scikit-learn >=1.9.1, pandas >=3.1 |
 | Tests | pytest >=9.1, `httpx2` (TestClient) |
 
 ## Run locally
 
-The app trains the model in memory in `lifespan` (about a second), so there is nothing to build first. `python -m app.ml.train` is an optional CLI that does the same and also writes `artifacts/model.joblib` and `artifacts/model_info.json` (git-ignored) and prints the metrics.
+The app trains the model in memory in `lifespan` (about a second), so there is nothing to build first.
 
 ```bash
 # with mise (repo root)
-mise run train        # optional: print metrics, write ml-api/artifacts/
 mise run dev:ml       # http://localhost:8000
 
 # plain
@@ -48,7 +47,6 @@ Read by `app/config.py` (pydantic-settings, env var = upper-cased field name).
 |---|---|---|
 | `DATA_PATH` | `../data/house_prices.csv` (repo root; `/data/house_prices.csv` in Docker) | Training CSV, read at startup (UTF-8 with BOM is handled) |
 | `MODEL_ALPHA` | `10.0` | Ridge strength. Fixed, not cross-validated. Model quality was deliberately not optimised; the task is architectural. α=10 is fixed so coefficients stay interpretable on collinear features; model selection is a future improvement |
-| `ARTIFACTS_DIR` | `ml-api/artifacts` | Only the `python -m app.ml.train` CLI writes here; the API does not read it |
 
 Every request gets an `X-Request-ID` (a valid incoming one, matching `^[A-Za-z0-9-]{1,64}$`, or a generated UUID4), echoed in the response and shown on each log line as `[req=...]`. The middleware logs one line per request and uvicorn's access log is disabled to avoid duplicates. No configuration.
 
@@ -56,7 +54,7 @@ Every request gets an `X-Request-ID` (a valid incoming one, matching `^[A-Za-z0-
 
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
-| GET | `/health` | Liveness | `{"status":"ok","model_loaded":true}` |
+| GET | `/health` | Liveness | `{"status":"ok"}` |
 | POST | `/predict` | Price for one house | 7-feature body; 422 on invalid input |
 | POST | `/predict/batch` | Prices for 1-1000 houses | Body is a JSON array; 422 if empty or over 1000 |
 | GET | `/model-info` | Model card | Coefficients, metrics, feature ranges |
@@ -88,12 +86,12 @@ cd ml-api && uv sync && uv run pytest -q   # 12 passed
 ml-api/
 ├── app/
 │   ├── main.py            # create_app(), lifespan trains the Predictor into app.state
-│   ├── config.py          # Settings (data_path, artifacts_dir)
+│   ├── config.py          # Settings (data_path, model_alpha)
 │   ├── deps.py            # get_predictor / PredictorDep
 │   ├── schemas.py         # HouseFeatures, Prediction, BatchPrediction
 │   ├── api/               # health.py, predictions.py, model_info.py (routers)
 │   ├── services/predictor.py  # Predictor: predict, extrapolation warnings
-│   └── ml/                # features.py (FEATURES, TARGET), train.py (train() + CLI; CV_FOLDS, CV_RANDOM_STATE constants)
+│   └── ml/                # train.py (train(); FEATURES, TARGET, CV_FOLDS, CV_RANDOM_STATE constants)
 ├── tests/                 # conftest.py, test_api.py, test_request_id.py, test_contract.py
 ├── Dockerfile             # no training, no data: both arrive at runtime
 └── pyproject.toml, uv.lock

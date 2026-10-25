@@ -18,12 +18,12 @@ flowchart LR
 | Web | `web` | One `@RestController`. Binds and validates DTOs, delegates, sets download headers. No logic. |
 | Service | `service` | Aggregation, paging/sort rules, what-if construction, export. Carries the `@Cacheable` annotations. |
 | Repository | `repository` | `JpaRepository` + `JpaSpecificationExecutor`. `PropertySpecifications.from(MarketFilter)` turns the filter into a `Specification`. |
-| Client | `client` | `MlClient`: the only code that calls ml-api; maps failures to `ApiException`s. |
+| Client | `client` | `MlClient`: the only code that calls ml-api; maps failures to `ResponseStatusException`s. |
 | Domain | `domain` | `Property` entity. Never leaves the service layer; the controller returns `PropertyDto`. |
 | DTO | `dto` | Java records: `MarketFilter`, `WhatIfRequest`, `HouseFeatures`, responses. Records give `equals`/`hashCode` for free, which makes them cache keys. |
 | Config | `config` | `AppConfig` (caching, RestClient), `MlProperties`. |
 | Ingest | `ingest` | `CsvPropertySync`: reloads the market table from the dataset file on start. |
-| Exception | `exception` | `ApiException` subclasses carry an HTTP status; `ApiExceptionHandler` renders them. |
+| Exception | `exception` | services throw `ResponseStatusException` (carries the HTTP status); `ApiExceptionHandler` adds the validation-error rendering. |
 
 ## Request flow: `POST /what-if`
 
@@ -59,9 +59,9 @@ sequenceDiagram
 
 | Exception | Status | Source |
 |---|---|---|
-| `BadRequestException` | 400 | unknown sort property or what-if feature; ml-api answered 400/422 |
-| `UpstreamErrorException` | 502 | ml-api 5xx or a malformed/mismatched response |
-| `UpstreamUnavailableException` | 503 | connect/read timeout or connection failure |
+| `ResponseStatusException` | 400 | unknown sort property or what-if feature; ml-api answered 400/422 |
+| `ResponseStatusException` | 502 | ml-api 5xx or a malformed/mismatched response |
+| `ResponseStatusException` | 503 | connect/read timeout or connection failure |
 | `MethodArgumentNotValidException` | 400 | request-body validation; `detail` is `field message; ...`, field paths in snake_case (`base.square_footage`, converted with Jackson's `SNAKE_CASE` strategy) |
 | Spring MVC defaults | 400 | bad `by` enum, missing parameter, type mismatch (via the base class) |
 
