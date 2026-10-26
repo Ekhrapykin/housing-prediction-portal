@@ -76,15 +76,28 @@ Every response carries `X-Content-Type-Options: nosniff`, `Referrer-Policy: stri
 
 ## Checks
 
-There are no unit or e2e tests in `web/` (vitest is a future step). Quality gates are lint, typecheck, the contract check and a production build, the same as CI:
+Quality gates are lint, typecheck, unit tests (which include the contract check) and a production build, the same as CI:
 
 ```bash
 npm run lint          # eslint .
 npx tsc --noEmit
-npm test                  # vitest: transports and clients against a fake fetch
-npm run check:contracts   # scripts/check-contracts.ts (tsx): zod house schema, segment/sort keys, filter parsers and what-if steps vs ../contracts
+npm test              # vitest (node): clients/transports, search params, format, house schema, contracts vs ../contracts
 npm run build         # needs network for fonts
 ```
+
+### E2E (Playwright)
+
+Browser checks of the market filters, properties, what-if and estimator pages. They are not in CI; they run against an already-running stack:
+
+```bash
+docker compose up -d --build     # from the repo root; wait until all 5 services are healthy
+npm run e2e                      # or: mise run e2e
+```
+
+- `E2E_BASE_URL` sets the target (default `http://localhost:3000`).
+- The browser is the locally installed Google Chrome (`channel: "chrome"`), so nothing is downloaded. `E2E_BROWSER=chromium` uses Playwright's bundled Chromium instead (`npx playwright install chromium` first).
+- Estimator writes are rate-limited to 20 per minute per client IP. The suite makes one write per run, so it can be re-run freely; if the limiter was exhausted by something else, a fresh `docker compose up` or a one-minute wait resets it.
+- Reports and traces go to `playwright-report/` and `test-results/` (git-ignored).
 
 ## Layout
 
@@ -105,8 +118,9 @@ web/
 │   ├── config.ts           # timings and tuning: stale times, revalidate, debounces, request timeout, what-if steps
 │   ├── house-schema.ts     # zod schema, field metadata, bounds
 │   ├── types.ts, format.ts, utils.ts
-├── scripts/check-contracts.ts  # npm run check:contracts
-├── vitest.config.mts           # npm test; specs sit next to the code (lib/clients/clients.test.ts)
+├── e2e/                        # Playwright specs (npm run e2e), fixtures.ts
+├── playwright.config.ts
+├── vitest.config.mts           # npm test; specs sit next to the code (lib/**/*.test.ts), e2e/ excluded
 ├── next.config.ts          # rewrites, standalone output
 └── Dockerfile
 ```

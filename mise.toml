@@ -25,9 +25,9 @@ dir = "web"
 run = "npm run dev"
 
 [tasks."lint:web"]
-description = "Lint, typecheck, contract-check and unit-test the Next.js portal"
+description = "Lint, typecheck and unit-test the Next.js portal"
 dir = "web"
-run = "npm run lint && npx tsc --noEmit && npm run check:contracts && npm test"
+run = "npm run lint && npx tsc --noEmit && npm test"
 
 [tasks.test]
 description = "Run pytest in both Python services and gradle test in market-api"
@@ -44,3 +44,8 @@ run = "docker compose up --build"
 [tasks.down]
 description = "Stop the docker compose stack"
 run = "docker compose down"
+
+[tasks.e2e]
+description = "Playwright e2e against the running stack (needs `docker compose up -d --build` first; Chrome must be installed)"
+dir = "web"
+run = "npm run e2e"

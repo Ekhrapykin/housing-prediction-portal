@@ -68,7 +68,7 @@ Wiring: `browser.ts` builds both clients over the browser transport (components 
 
 To add an estimator endpoint: add the path to `estimator-paths.ts` (and to `ESTIMATOR_PROXIED` if the browser calls it), then a `queries` entry or mutation in `estimator.ts`.
 
-`npm test` (vitest, node environment; `lib/clients/clients.test.ts`, fake `fetch`) covers error mapping, timeouts, abort, key/path equality across transports and invalidation.
+`npm test` (vitest, node environment, specs next to the code) covers: the clients and transports against a fake `fetch` (error mapping, timeouts, abort, key/path equality, invalidation, the `page`/`sort` translation for market-api), the URL parsers, formatters, the zod house schema, and `lib/contracts.test.ts`, which compares the zod schema, segment/sort keys, filter parsers and what-if steps with `../contracts`. `npm run e2e` (Playwright, `e2e/`) drives the market filters, properties, what-if and estimator pages in Chrome against a running compose stack; it is not in CI.
 
 ## Request flow: market dashboard
 
@@ -149,11 +149,11 @@ Market filters, segment (`by`), sort and page live in the query string. URL stat
 | Market app server-rendered from the URL | Shareable views, no client state to sync, and the cache can sit at the fetch layer. |
 | `Result<T>` instead of throwing | Partial failure per region and readable messages in production. |
 | One client per backend, over a transport | Paths, keys, error mapping and invalidation live in one place; browser and server prefetch share the same `queryOptions` and differ only in the fetcher. |
-| zod bounds mirror the backends | Instant field errors without a round-trip. `scripts/check-contracts.ts` compares them with `contracts/` (also segment/sort keys, filter parsers, what-if steps) in `mise run lint:web` and CI. |
+| zod bounds mirror the backends | Instant field errors without a round-trip. `lib/contracts.test.ts` compares them with `contracts/` (also segment/sort keys, filter parsers, what-if steps) as part of `npm test`, in `mise run lint:web` and CI. |
 
 ## Known limitations and next steps
 
-- No unit or e2e test suite; lint, `tsc`, `next build`, `check:contracts` and the vitest spec are the gates.
+- Gates are lint, `tsc`, `next build` and the vitest suite; Playwright e2e runs locally against the compose stack, not in CI. No component tests yet.
 - The `market` fetch tag is reserved for an on-demand `revalidateTag("market")` once on-the-fly retraining or data reloads exist (see "Future improvements" in the root [ARCHITECTURE.md](../ARCHITECTURE.md)). No code calls it yet; the data is static and the 300 s revalidate covers it.
 - The scatter plot fetches up to 100 properties, which covers the 50-row dataset only.
 - Backend URLs are baked into the image at build time; changing them needs a rebuild.

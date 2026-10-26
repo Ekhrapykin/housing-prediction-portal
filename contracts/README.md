@@ -16,7 +16,7 @@ Each service mirrors the contract natively; a contract test enforces equality. T
 | ml-api | `tests/test_contract.py` (`uv run pytest`) |
 | estimator-api | `tests/test_contract.py` (`uv run pytest`) |
 | market-api | `ContractTest` (`./gradlew test`; the contracts dir is passed in by `build.gradle.kts`) |
-| web | `scripts/check-contracts.ts` (`npm run check:contracts`, part of `mise run lint:web` and the `test-web` CI job) |
+| web | `web/lib/contracts.test.ts` (vitest; runs in `npm test`, part of `mise run lint:web` and the `test-web` CI job) |
 
 Notes:
 

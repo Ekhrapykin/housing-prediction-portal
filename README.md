@@ -78,7 +78,7 @@ Against the task PDF ("Interview Tasks Fullstack"), paraphrased. "Partial" rows 
 
 ### Extras beyond the PDF
 
-Write rate limiting on estimator-api (slowapi) and an `X-Request-ID` that follows a request through the portal, every backend and the logs (see [ARCHITECTURE.md](ARCHITECTURE.md#rate-limiting)). Tests (pytest in both Python services, JUnit in market-api; web has lint, `tsc`, a contract check and a build but no unit tests), shared contracts with a contract test per service, Docker Compose with Postgres, and the CI/CD workflow.
+Write rate limiting on estimator-api (slowapi) and an `X-Request-ID` that follows a request through the portal, every backend and the logs (see [ARCHITECTURE.md](ARCHITECTURE.md#rate-limiting)). Tests (pytest in both Python services, JUnit in market-api; web has lint, `tsc`, vitest unit tests including the contract check, a build, and local Playwright e2e), shared contracts with a contract test per service, Docker Compose with Postgres, and the CI/CD workflow.
 
 ## Quick start
 
@@ -140,7 +140,7 @@ mise run test                 # or per service:
 cd ml-api && uv run pytest -q                                    # 12 tests (trains in lifespan)
 cd estimator-api && uv run pytest -q                             # 18 tests
 cd market-api && ./gradlew test                                  # JUnit 5 + Spring Test
-cd web && npm run lint && npx tsc --noEmit                       # no unit tests in web
+cd web && npm run lint && npx tsc --noEmit && npm test           # vitest; `mise run e2e` runs Playwright against a running stack
 ```
 
 What each suite covers is listed in the service READMEs.
@@ -161,7 +161,7 @@ Manual deploy, from a checkout of the repo (compose bind-mounts `./data` and `./
 
 `.github/workflows/ci-cd.yml`:
 
-1. **Test** (every push and PR): pytest for ml-api (it trains in `lifespan` from the repo's CSV) and estimator-api (SQLite), `./gradlew test` for market-api (H2), lint + `tsc` + `next build` for web.
+1. **Test** (every push and PR): pytest for ml-api (it trains in `lifespan` from the repo's CSV) and estimator-api (SQLite), `./gradlew test` for market-api (H2), lint + `tsc` + vitest + `next build` for web (Playwright e2e is local only).
 2. **Build** (not on PRs): each service built for `linux/arm64` on `ubuntu-24.04-arm`, pushed to GHCR as `latest` and the commit SHA.
 3. **Deploy** (`main` only, `pi` runner): with `TAG` set to the commit SHA, `docker compose pull`, `up -d --no-build --remove-orphans`, wait until every container is healthy, prune old images. Roll back by running compose with `TAG=<older sha>`.
 

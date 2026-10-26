@@ -62,7 +62,7 @@ Rules:
 | market-api | `market-api/.../dto/HouseFeatures.java` | Validate the what-if base house |
 | web | `web/lib/house-schema.ts` (zod), `web/lib/types.ts` | Instant form errors, typed UI |
 
-Why mirror instead of share: three languages and four deployables; a shared package or codegen would be more machinery than a 7-field schema that hasn't changed. Each copy fails fast at its own boundary, and ml-api still validates last. Drift is caught by one contract test per service (`ml-api` and `estimator-api` `tests/test_contract.py`, market-api `ContractTest`, web `npm run check:contracts`), all comparing the native schema with the files in `contracts/`. To change a bound: edit the contract first, then every mirror. Contracts are only read by tests, so no Docker image needs them. The trigger to go further is a fifth consumer: generate clients from ml-api's OpenAPI.
+Why mirror instead of share: three languages and four deployables; a shared package or codegen would be more machinery than a 7-field schema that hasn't changed. Each copy fails fast at its own boundary, and ml-api still validates last. Drift is caught by one contract test per service (`ml-api` and `estimator-api` `tests/test_contract.py`, market-api `ContractTest`, web `lib/contracts.test.ts` in `npm test`), all comparing the native schema with the files in `contracts/`. To change a bound: edit the contract first, then every mirror. Contracts are only read by tests, so no Docker image needs them. The trigger to go further is a fifth consumer: generate clients from ml-api's OpenAPI.
 
 ## Flow: create an estimate
 
@@ -213,13 +213,14 @@ flowchart LR
 - **Schema duplicated four times**, with drift caught by the contract tests in `contracts/`; generate clients from ml-api's OpenAPI if it changes.
 - **Error contract is not uniform:** 400 vs 422 for validation, and FastAPI 422 `detail` is a list (the portal normalises it, other clients must handle both).
 - **No auth;** the estimate history is shared by everyone. The write rate limit is per client address, not per user.
-- **No e2e tests,** and the portal has only the contract check, no unit tests.
+- **E2E tests are local only:** the Playwright suite (`mise run e2e`) needs the compose stack and is not run in CI. The portal has unit tests (vitest) but no component tests.
 - **Single host, no TLS termination of its own;** relies on the tunnel.
 
 ## Future improvements
 
 - **Model selection.** Alpha is fixed at 10 and model quality was not optimised. Compare alphas, feature subsets and other models with nested CV, and add VIF to `/model-info`.
-- **Vitest for the web.** Vitest already runs the clients spec (`web/lib/clients/clients.test.ts`); move the contract check (`web/scripts/check-contracts.ts`) into it and add unit tests for the zod schema and the URL parsers.
+- **E2E in CI.** Run the Playwright suite (`web/e2e`) in GitHub Actions by bringing the compose stack up (`docker compose up -d --build`, wait for healthy) before `npm run e2e`.
+- **Component tests for the web.** Testing Library + jsdom for the estimate form (required-field errors send no request) and the market filters Reset.
 - **Generated web types.** Generate the web's response types from the backends' OpenAPI (`openapi-typescript`) instead of the hand-written `lib/types.ts`.
 - **On-the-fly retraining.** `POST /admin/retrain` in ml-api reads the (new) CSV, validates it (columns, ranges, row count), trains, and swaps the in-memory model only if the CV metrics pass a threshold (for example R2 not below the current model's minus a tolerance). A `model_runs` table would log every attempt with metrics, data hash and outcome, which also gives the model versioning ml-api lacks today.
 - **Migrations.** Alembic for estimator-api and Flyway for market-api once a column has to change on live data; `create_all` and `ddl-auto: create` only handle the first creation.

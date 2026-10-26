@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "check:contracts": "tsx scripts/check-contracts.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -31,6 +31,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^26.6.5",
     "@types/react": "^19",
@@ -38,7 +39,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "tailwindcss": "^4",
-    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.5"
   }
