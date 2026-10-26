@@ -1,8 +1,6 @@
 # ml-api
 
-Task 1 of the take-home: a housing-price model behind an HTTP API. A Ridge regression (fixed alpha 10, env `MODEL_ALPHA`) is trained at startup on the 50-row dataset (`../data/house_prices.csv` in the repo root, shared with market-api) and served with FastAPI. It predicts single or batch prices, flags inputs outside the training range, and exposes the coefficients and metrics at `/model-info`. The other two backends (`estimator-api`, `market-api`) call it; nothing else does.
-
-System context: [../README.md](../README.md). Internals: [ARCHITECTURE.md](ARCHITECTURE.md).
+A housing-price model behind an HTTP API. A Ridge regression (fixed alpha 10, env `MODEL_ALPHA`) is trained at startup on the 50-row dataset (`../data/house_prices.csv` in the repo root, shared with market-api) and served with FastAPI. It predicts single or batch prices, flags inputs outside the training range, and exposes the coefficients and metrics at `/model-info`. The other two backends (`estimator-api`, `market-api`) call it; nothing else does.
 
 ## Stack
 
@@ -34,10 +32,10 @@ Swagger UI: http://localhost:8000/docs
 
 ```bash
 docker build -t hpp-ml-api ml-api
-docker run --rm -p 8000:8000 -v "$PWD/data:/data:ro" hpp-ml-api
+docker run --rm -p 8000:8000 -v "$PWD/data/house_prices.csv:/data/house_prices.csv:ro" hpp-ml-api
 ```
 
-The image holds no data and no model: the CSV comes from a read-only mount at `/data` (`DATA_PATH=/data/house_prices.csv` is baked in as the default) and the model is trained when the container starts. In compose, `./data` is bind-mounted, the service is published on `8000`, and its `/health` healthcheck has a 30 s start period; the other backends wait for it.
+The image holds no data and no model: the CSV comes from a read-only file mount at `/data/house_prices.csv` (`DATA_PATH=/data/house_prices.csv` is baked in as the default) and the model is trained when the container starts. In compose, `./data/house_prices.csv` is bind-mounted, the service is published on `8000`, and its `/health` healthcheck (defined in `docker-compose.yml`) has a 30 s start period; the other backends wait for it.
 
 ## Configuration
 
@@ -46,11 +44,11 @@ Read by `app/config.py` (pydantic-settings, env var = upper-cased field name).
 | Env var | Default | Purpose |
 |---|---|---|
 | `DATA_PATH` | `../data/house_prices.csv` (repo root; `/data/house_prices.csv` in Docker) | Training CSV, read at startup (UTF-8 with BOM is handled) |
-| `MODEL_ALPHA` | `10.0` | Ridge strength. Fixed, not cross-validated. Model quality was deliberately not optimised; the task is architectural. α=10 is fixed so coefficients stay interpretable on collinear features; model selection is a future improvement |
+| `MODEL_ALPHA` | `10.0` | Ridge strength. Fixed, not cross-validated, so coefficients stay interpretable on collinear features (see [limitations](../ARCHITECTURE.md#limitations-and-future-work)) |
 
 Every request gets an `X-Request-ID` (a valid incoming one, matching `^[A-Za-z0-9-]{1,64}$`, or a generated UUID4), echoed in the response and shown on each log line as `[req=...]`. The middleware logs one line per request and uvicorn's access log is disabled to avoid duplicates. No configuration.
 
-## Endpoints
+## API
 
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
@@ -75,12 +73,12 @@ curl -s localhost:8000/predict -H 'content-type: application/json' -d '{
 ## Tests
 
 ```bash
-cd ml-api && uv sync && uv run pytest -q   # 12 passed
+cd ml-api && uv sync && uv run pytest -q
 ```
 
-`tests/test_api.py` drives the real app, which trains on the repo's CSV in `lifespan`, through `TestClient`: health, a plausible single price (150k-450k, no warnings), batch count, empty batch and out-of-range input rejected with 422, an extrapolation warning, and `/model-info` shape. `test_api.py` also asserts the `square_footage`, `bedrooms` and `year_built` coefficients are positive at the default alpha. `tests/test_request_id.py` covers the request id (echo, generate, replace invalid). `tests/test_contract.py` compares `HouseFeatures.model_json_schema()` with `contracts/house-features.schema.json`. There are no unit tests for `train.py`; CI just runs pytest.
+`tests/test_api.py` drives the real app, which trains on the repo's CSV in `lifespan`, through `TestClient`: health, a plausible single price (150k-450k, no warnings), batch count, empty batch and out-of-range input rejected with 422, an extrapolation warning, and `/model-info` shape. `test_api.py` also asserts the `square_footage`, `bedrooms` and `year_built` coefficients are positive at the default alpha. `tests/test_request_id.py` covers the request id (echo, generate, replace invalid). `tests/test_contract.py` compares `HouseFeatures.model_json_schema()` with `contracts/house-features.schema.json`.
 
-## Layout
+## Project layout
 
 ```
 ml-api/
@@ -96,3 +94,8 @@ ml-api/
 ├── Dockerfile             # no training, no data: both arrive at runtime
 └── pyproject.toml, uv.lock
 ```
+
+## Further reading
+
+- [ARCHITECTURE.md](ARCHITECTURE.md): layers, training, errors, request id, decisions.
+- Root docs: [README](../README.md), [ARCHITECTURE](../ARCHITECTURE.md) (cross-cutting contracts, [limitations and future work](../ARCHITECTURE.md#limitations-and-future-work)).

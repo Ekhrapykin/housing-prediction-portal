@@ -83,7 +83,7 @@ There is no rate limit on what-if: the Caffeine cache and the `steps` cap (at mo
 - Default config is H2 in-memory (`jdbc:h2:mem:market`, `create-drop`), so `bootRun` and the tests need no database. The `docker` profile (`application-docker.yml`) points at the shared Postgres as role `market` with `hibernate.default_schema=market`, and uses `ddl-auto: create`: Hibernate drops and recreates the table at startup, with no migrations.
 - **It is a sync, not a one-off seed.** The CSV is the source of truth and ml-api trains from the same file, so the `market` table is a read model derived from it. Reloading on every start keeps the dashboard and the model on the same data after the file changes (new data = restart, no migration), and it is what fills the in-memory H2 in dev and tests. The reload is a full replace (`deleteAllInBatch()` then `saveAll`), so it is idempotent: a restart never duplicates rows, and rows removed from the CSV disappear. It costs milliseconds for 50 rows.
 - Alternatives considered: a Postgres init script (`COPY ... FROM`) runs only when the volume is first created, so CSV updates would never arrive, and H2 would still need its own loader; a Flyway seed migration is the right tool once data is owned by migrations, but every CSV change would need a new migration; a one-shot `market-seed` container adds an image and startup ordering for 50 rows.
-- `market.sync-on-startup` (`MARKET_SYNC_ON_STARTUP`, default `true`) turns the sync off without a code change, for when Flyway takes over (see the root future improvements).
+- `market.sync-on-startup` (`MARKET_SYNC_ON_STARTUP`, default `true`) turns the sync off without a code change, for when Flyway takes over (see [Limitations and future work](../ARCHITECTURE.md#limitations-and-future-work)).
 - `open-in-view` is off; services open their own transactions through the repository.
 - Filtering is a JPA `Specification` (`Specification.allOf` over the non-null filters), shared by summary, segments, paging and exports. Sort keys are checked against a whitelist (`SORTABLE`) and snake_case is converted to the entity's camelCase.
 - Aggregates (summary, segments) are computed in Java over the filtered list (`ponytail` note in `MarketService`); with 50 rows that is simpler than JPQL aggregates.
@@ -122,8 +122,9 @@ Value-based record keys mean two requests with the same parameters hit the same 
 | Virtual threads | Request threads are cheap while blocked on ml-api. |
 | Bounds mirrored in `HouseFeatures` | Fails fast with a 400 before spending a round-trip. `ContractTest` checks them against `contracts/house-features.schema.json`. |
 
-## Known limitations and next steps
+## Limitations
 
-- In-memory aggregates and `findAll` for exports do not scale past a small dataset; push aggregation into JPQL or SQL and stream exports.
-- The CSV is duplicated with ml-api. A shared read-only `housing` schema would remove the copy (root [ARCHITECTURE.md](../ARCHITECTURE.md)).
-- No tests for exports or cache behaviour; no test hits a real ml-api.
+- Tests do not cover exports, cache behaviour, or the HTTP/1.1 client against a live ml-api (uvicorn).
+- The request id lives in the thread-bound MDC; code that hands work to another thread must copy it.
+
+System-wide items (in-memory aggregates, dataset loaded twice, migrations): [Limitations and future work](../ARCHITECTURE.md#limitations-and-future-work).

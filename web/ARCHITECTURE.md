@@ -91,7 +91,7 @@ sequenceDiagram
   and
     L->>M: GET /properties?size=100
   end
-  M-->>L: JSON (fetch cache: revalidate 300, tag market)
+  M-->>L: JSON (fetch cache: revalidate 300)
   L-->>P: Result<T> per region
   P-->>U: streamed HTML in Suspense
 ```
@@ -112,7 +112,7 @@ Rewrites are an allow-list built from `ESTIMATOR_PROXIED` / `MARKET_PROXIED` in 
 
 | Data | Where | Policy |
 |---|---|---|
-| Market reads (server) | Next fetch cache | `next: { revalidate: 300 }`: shared, read-only data (no cache tag; add one with `revalidateTag` once data can change at runtime) |
+| Market reads (server) | Next fetch cache | `next: { revalidate: 300 }`: shared, read-only data (no cache tag yet; see [limitations](../ARCHITECTURE.md#limitations-and-future-work)) |
 | Estimator reads (server) | none | `cache: "no-store"`: user data |
 | All server loaders | | `await connection()` first, so pages are rendered per request, never prerendered at build when backends are absent |
 | Browser queries | TanStack Query | `staleTime` 30 s; model info 10 min; what-if keyed by the serialized request with `keepPreviousData` |
@@ -151,9 +151,8 @@ Market filters, segment (`by`), sort and page live in the query string. URL stat
 | One client per backend, over a transport | Paths, keys, error mapping and invalidation live in one place; browser and server prefetch share the same `queryOptions` and differ only in the fetcher. |
 | zod bounds mirror the backends | Instant field errors without a round-trip. `lib/contracts.test.ts` compares them with `contracts/` (also segment/sort keys, filter parsers, what-if steps) as part of `npm test`, in `mise run lint:web` and CI. |
 
-## Known limitations and next steps
+## Limitations
 
-- Gates are lint, `tsc`, `next build` and the vitest suite; Playwright e2e runs locally against the compose stack, not in CI. No component tests yet.
-- The `market` fetch tag is reserved for an on-demand `revalidateTag("market")` once on-the-fly retraining or data reloads exist (see "Future improvements" in the root [ARCHITECTURE.md](../ARCHITECTURE.md)). No code calls it yet; the data is static and the 300 s revalidate covers it.
-- The scatter plot fetches up to 100 properties, which covers the 50-row dataset only.
-- Backend URLs are baked into the image at build time; changing them needs a rebuild.
+- The rewrite proxy cannot reshape errors, so a browser 5xx without a `detail` is shown as a generic message by status (the proxy could not reach the backend).
+
+System-wide items (e2e in CI, component tests, cache invalidation, build-time backend URLs, scatter size): [Limitations and future work](../ARCHITECTURE.md#limitations-and-future-work).

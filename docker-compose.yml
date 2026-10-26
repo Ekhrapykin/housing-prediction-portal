@@ -3,6 +3,13 @@
 x-common: &common
   restart: unless-stopped
 
+# Shared healthcheck timings; each service adds its own `test` and overrides only what it needs.
+x-healthcheck: &healthcheck
+  interval: 10s
+  timeout: 3s
+  retries: 5
+  start_period: 15s
+
 services:
   postgres:
     <<: *common
@@ -28,15 +35,12 @@ services:
       - max_connections=30
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./data/postgres/init:/docker-entrypoint-initdb.d:ro
     mem_limit: 384m
     healthcheck:
+      <<: *healthcheck
       # -h 127.0.0.1: the temporary init-time server only listens on the unix socket, so this stays unhealthy until init is done.
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d housing"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
 
   ml-api:
     <<: *common
@@ -46,14 +50,12 @@ services:
     ports: ["8000:8000"]
     environment:
       DATA_PATH: /data/house_prices.csv
-    volumes: ["./data:/data:ro"]
+    volumes: ["./data/house_prices.csv:/data/house_prices.csv:ro"]
     mem_limit: 512m
     healthcheck:
+      <<: *healthcheck
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 30s
+      start_period: 30s # trains the model at startup
 
   estimator-api:
     <<: *common
@@ -71,11 +73,8 @@ services:
       ml-api: { condition: service_healthy }
       postgres: { condition: service_healthy }
     healthcheck:
+      <<: *healthcheck
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 15s
 
   market-api:
     <<: *common
@@ -88,18 +87,16 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       MARKET_DB_PASSWORD: ${MARKET_DB_PASSWORD:-market_demo}
       DATA_PATH: /data/house_prices.csv
-    volumes: ["./data:/data:ro"]
+    volumes: ["./data/house_prices.csv:/data/house_prices.csv:ro"]
     mem_limit: 640m
     depends_on:
       ml-api: { condition: service_healthy }
       postgres: { condition: service_healthy }
     healthcheck:
+      <<: *healthcheck
       # temurin JRE images ship curl.
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 6
-      start_period: 40s
+      start_period: 40s # JVM + Spring startup
 
   web:
     <<: *common
@@ -118,11 +115,9 @@ services:
       estimator-api: { condition: service_healthy }
       market-api: { condition: service_healthy }
     healthcheck:
+      <<: *healthcheck
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      timeout: 5s # node cold-start + SSR of /
 
 volumes:
   postgres-data:

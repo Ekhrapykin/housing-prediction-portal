@@ -65,13 +65,13 @@ Every failure is rendered as `{"detail": ...}`, the same contract the other serv
 
 ## Data and persistence
 
-SQLAlchemy 2.0 with the typed declarative style (`DeclarativeBase`, `Mapped[...]`, `mapped_column`), one table, `EstimateRow` in `db.py`:
+SQLAlchemy 2.x with the typed declarative style (`DeclarativeBase`, `Mapped[...]`, `mapped_column`), one table, `EstimateRow` in `db.py`:
 
 `estimates(id INTEGER PK, label TEXT NULL, features JSON, price FLOAT, warnings JSON, created_at TEXT)`
 
 `features` and `warnings` use the generic `JSON` type (JSON text on SQLite, `json` on Postgres); `created_at` is an ISO-8601 UTC string. `lifespan` builds the `Engine` from `DATABASE_URL` and a `sessionmaker`, keeps the factory on `app.state`, and runs `Base.metadata.create_all`, so there are no migrations. `get_session` is the request-scoped `Session` dependency: commit after the handler succeeds, roll back on any exception, always close. The repository only calls `add`/`flush`/`select`/`delete` on that session.
 
-**Which schema.** The model has no `schema=`. `DATABASE_URL` selects the backend: SQLite for local runs and tests, Postgres in compose. On Postgres the `estimator` role is created with `ALTER ROLE estimator SET search_path = estimator` (`postgres/init/01-schemas.sh`), so `create_all` and every query resolve to `estimator.estimates`, and the role has no grants on `market`. SQLite has no schemas, so the same code works unchanged.
+**Which schema.** The model has no `schema=`. `DATABASE_URL` selects the backend: SQLite for local runs and tests, Postgres in compose. On Postgres the `estimator` role is created with `ALTER ROLE estimator SET search_path = estimator` (`data/postgres/init/01-schemas.sh`), so `create_all` and every query resolve to `estimator.estimates`, and the role has no grants on `market`. SQLite has no schemas, so the same code works unchanged.
 
 ## ml-api connection pool
 
@@ -92,16 +92,16 @@ SQLAlchemy 2.0 with the typed declarative style (`DeclarativeBase`, `Mapped[...]
 | Decision | Why |
 |---|---|
 | Service owns ml-api calls, not the portal | Keeps the model private, persists every estimate with its warnings, one place for error mapping. |
-| SQLAlchemy 2.0 ORM, not raw SQL | One codebase runs on SQLite (tests, local) and Postgres (Docker) with no SQL dialect code; the typed model is the schema. Cost: a dependency for one table. |
+| SQLAlchemy 2.x ORM, not raw SQL | One codebase runs on SQLite (tests, local) and Postgres (Docker) with no SQL dialect code; the typed model is the schema. Cost: a dependency for one table. |
 | JSON text columns | Features are always read and written as a unit; no querying inside them. |
 | Session per request, commit in the dependency | One transaction per request; a failed handler rolls back. Sessions are never shared across threads. |
 | Feature schema duplicated from ml-api | Pinned to `contracts/house-features.schema.json` by `tests/test_contract.py`. Fails fast without a round-trip. |
 | Domain error hierarchy | Services and clients stay HTTP-agnostic; one handler owns the wire format. |
 | `/health` always 200 with `ml_api: up/down` | The service is alive even when its dependency is not; compose healthchecks stay stable. |
 
-## Known limitations and next steps
+## Limitations
 
-- No authentication or per-user scoping: all clients share one history, and the portal never caches it (see the root [ARCHITECTURE.md](../ARCHITECTURE.md)).
-- 422 `detail` is a list for validation errors but a string elsewhere; clients must handle both.
-- `create_all` only creates missing tables; changing a column needs a migration tool (Alembic is listed under future improvements in the root [ARCHITECTURE.md](../ARCHITECTURE.md)).
-- The prediction inherits ml-api's collinearity caveat ([../ml-api/ARCHITECTURE.md](../ml-api/ARCHITECTURE.md)).
+- Tests do not cover `MlClient`'s HTTP status mapping (only request-id forwarding is tested, over `httpx.MockTransport`), the `limit` bounds, or DELETE 204.
+- The history has a `limit` (1-500) but no offset or cursor paging.
+
+System-wide items (no auth, migrations, error-contract shape, in-memory rate limit): [Limitations and future work](../ARCHITECTURE.md#limitations-and-future-work).

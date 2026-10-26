@@ -11,6 +11,4 @@ RUN useradd --system --uid 10001 app
 USER app
 
 EXPOSE 8001
-HEALTHCHECK --interval=15s --timeout=3s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]

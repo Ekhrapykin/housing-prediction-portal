@@ -10,7 +10,7 @@ class Base(DeclarativeBase):
 
 
 class EstimateRow(Base):
-    # No schema here: on Postgres the role's search_path (set in postgres/init) puts the table in `estimator`.
+    # No schema here: on Postgres the role's search_path (set in data/postgres/init) puts the table in `estimator`.
     __tablename__ = "estimates"
 
     id: Mapped[int] = mapped_column(primary_key=True)

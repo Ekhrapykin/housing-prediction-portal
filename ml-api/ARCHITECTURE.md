@@ -54,7 +54,7 @@ The model card (served at `/model-info`) holds two views of the coefficients. `c
 
 The CV split uses a fixed seed, so every start gives the same metrics. Last local run (alpha 10): CV R2 0.973, CV RMSE about 12.2k, CV MAE about 10.9k. Raw coefficients are all positive (about +$24 per sq ft, +$9.7k per bedroom).
 
-Model quality was deliberately not optimised; the task is architectural. α=10 is fixed so coefficients stay interpretable on collinear features; model selection is a future improvement. Alpha comes from `Settings.model_alpha` (env `MODEL_ALPHA`, default 10.0).
+Model quality is not the focus: the project is about the service architecture around the model; α=10 is fixed so coefficients stay interpretable on collinear features. Alpha comes from `Settings.model_alpha` (env `MODEL_ALPHA`, default 10.0).
 
 ## Lifespan and statelessness
 
@@ -85,12 +85,12 @@ No database. The training CSV is the single copy at the repo root (`data/house_p
 | `Predictor` in `app.state` via `lifespan` | Load once, inject through `Depends`, easy to fake in tests. |
 | Sync route handlers | sklearn is CPU-bound and blocking; FastAPI runs sync handlers in a threadpool. |
 
-## Known limitations and next steps
+## Limitations
 
-- **Collinear features.** Coefficients of single features are not individually identifiable (see Data notes), so read them as "holding the others fixed" effects, not causal ones. Alpha is fixed rather than selected; model selection is a future improvement. Adding VIF to `/model-info` would document the problem.
-- 50 training rows; the CV estimate is noisy and there is no held-out test set.
-- No model versioning: `trained_at` is the only identifier.
-- Retraining needs a restart; an admin endpoint that retrains and swaps the model safely is listed under future improvements in the root [ARCHITECTURE.md](../ARCHITECTURE.md).
+- `train.py` has no unit tests of its own; it is covered through the API tests, which train on the real CSV.
+- Extrapolation warnings are a per-feature `[min, max]` check against `feature_stats`; they do not detect a combination of features that is far from the data while each one is in range.
+
+System-wide items (collinearity, 50 rows, model selection, versioning, retraining): [Limitations and future work](../ARCHITECTURE.md#limitations-and-future-work).
 
 ## Data notes
 
