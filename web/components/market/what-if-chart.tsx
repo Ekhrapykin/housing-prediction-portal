@@ -23,10 +23,10 @@ export function WhatIfChart({
           <YAxis tickFormatter={(v: number) => `$${Math.round(v / 1000)}k`} domain={["auto", "auto"]} fontSize={12} />
           <Tooltip labelFormatter={(v) => featureValue(feature, Number(v))} formatter={(v) => money(Number(v))} />
           {from < stat.min && (
-            <ReferenceArea x1={from} x2={stat.min} fill="#f59e0b" fillOpacity={0.15} label={{ value: "extrapolation", fontSize: 11 }} />
+            <ReferenceArea x1={from} x2={stat.min} fill="var(--muted-foreground)" fillOpacity={0.12} label={{ value: "extrapolation", fontSize: 11 }} />
           )}
           {to > stat.max && (
-            <ReferenceArea x1={stat.max} x2={to} fill="#f59e0b" fillOpacity={0.15} label={{ value: "extrapolation", fontSize: 11 }} />
+            <ReferenceArea x1={stat.max} x2={to} fill="var(--muted-foreground)" fillOpacity={0.12} label={{ value: "extrapolation", fontSize: 11 }} />
           )}
           {baseValue >= from && baseValue <= to && (
             <ReferenceLine x={baseValue} stroke="var(--chart-2)" strokeDasharray="4 4" label={{ value: "base", fontSize: 11, position: "top" }} />

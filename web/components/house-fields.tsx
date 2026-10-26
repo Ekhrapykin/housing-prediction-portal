@@ -1,11 +1,22 @@
 "use client";
 
+import { Bath, BedDouble, CalendarDays, GraduationCap, LandPlot, type LucideIcon, MapPin, Ruler } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FIELDS, type EstimateFormValues } from "@/lib/house-schema";
 import type { FeatureName, FeatureStat } from "@/lib/types";
 import { featureValue } from "@/lib/format";
+
+const ICON: Record<FeatureName, LucideIcon> = {
+  square_footage: Ruler,
+  bedrooms: BedDouble,
+  bathrooms: Bath,
+  year_built: CalendarDays,
+  lot_size: LandPlot,
+  distance_to_city_center: MapPin,
+  school_rating: GraduationCap,
+};
 
 /** The 7 house inputs, rendered from FIELDS. Shared by the estimator form and the what-if base house. */
 export function HouseFields({
@@ -27,11 +38,15 @@ export function HouseFields({
         const id = `${idPrefix}-${f.name}`;
         const error = errors[f.name]?.message;
         const stat = stats?.[f.name];
+        const Icon = ICON[f.name];
         return (
           <div key={f.name} className="space-y-1.5">
             <Label htmlFor={id}>
-              {f.label}
-              {f.unit && <span className="font-normal text-muted-foreground"> ({f.unit})</span>}
+              <Icon className="size-4 text-primary" aria-hidden />
+              <span>
+                {f.label}
+                {f.unit && <span className="font-normal text-muted-foreground"> ({f.unit})</span>}
+              </span>
             </Label>
             <Input
               id={id}

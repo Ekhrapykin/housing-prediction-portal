@@ -1,34 +1,33 @@
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { APPS } from "@/components/apps";
 import { PageHeader } from "@/components/page-header";
-
-const APPS = [
-  {
-    href: "/estimator",
-    title: "Price Estimator",
-    description: "Enter a house's features, get a predicted price with a per-feature breakdown, keep a history and compare properties side by side.",
-  },
-  {
-    href: "/market",
-    title: "Market Explorer",
-    description: "Filter the housing market, see segment averages and price vs size, browse every property, and run what-if scenarios.",
-  },
-];
 
 export default function Home() {
   return (
     <>
-      <PageHeader title="Housing Prediction Portal" description="Pick an app to get started." />
+      <PageHeader title="Housing Prediction Portal" description="Price estimates from the regression model and analysis of the housing market, in one place." />
       <div className="grid gap-4 sm:grid-cols-2">
-        {APPS.map((a) => (
-          <Link key={a.href} href={a.href} className="group rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-            <Card className="h-full transition-shadow group-hover:shadow-md">
-              <CardHeader>
-                <CardTitle className="text-lg">{a.title}</CardTitle>
-                <CardDescription>{a.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="text-sm font-medium text-primary">Open →</CardContent>
-            </Card>
+        {Object.values(APPS).map((a) => (
+          <Link
+            key={a.href}
+            href={a.href}
+            className="group flex flex-col gap-4 rounded-xl border-l-4 border-primary bg-card p-5 ring-1 ring-foreground/10 outline-none transition-colors hover:bg-accent/40 focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <div className="flex items-center gap-3">
+              <span className="grid size-10 place-items-center rounded-lg bg-accent text-primary" aria-hidden>
+                <a.icon className="size-5" />
+              </span>
+              <h2 className="text-lg font-semibold tracking-tight group-hover:text-primary">{a.title}</h2>
+            </div>
+            <p className="text-sm text-muted-foreground">{a.description}</p>
+            <ul className="mt-auto flex flex-wrap gap-x-4 gap-y-1 text-sm text-foreground/80">
+              {a.sections.map((s) => (
+                <li key={s.href} className="flex items-center gap-1.5">
+                  <s.icon className="size-3.5 text-primary" aria-hidden />
+                  {s.label}
+                </li>
+              ))}
+            </ul>
           </Link>
         ))}
       </div>

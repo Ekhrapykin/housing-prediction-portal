@@ -1,5 +1,6 @@
 "use client";
 
+import { RotateCcw } from "lucide-react";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,6 +76,7 @@ export function Filters({ children }: { children: React.ReactNode }) {
         </div>
         <div className="flex items-end">
           <Button type="button" variant="outline" onClick={filters.reset}>
+            <RotateCcw aria-hidden />
             Reset
           </Button>
         </div>

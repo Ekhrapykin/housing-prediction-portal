@@ -1,3 +1,4 @@
+import { ArrowLeftRight, Building2, Ruler, Scale, Tag } from "lucide-react";
 import { ErrorState } from "@/components/error-state";
 import { ExportButtons } from "@/components/market/export-buttons";
 import { PriceScatter } from "@/components/market/price-scatter";
@@ -17,11 +18,11 @@ export async function Dashboard({ raw }: { raw: SearchParams }) {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard label="Properties" value={String(summary.data.count)} />
-        <StatCard label="Average price" value={money(summary.data.avg_price)} />
-        <StatCard label="Median price" value={money(summary.data.median_price)} />
-        <StatCard label="Price range" value={`${money(summary.data.min_price)} – ${money(summary.data.max_price)}`} />
-        <StatCard label="Avg $ / sq ft" value={money(summary.data.avg_price_per_sqft)} />
+        <StatCard label="Properties" icon={Building2} value={String(summary.data.count)} />
+        <StatCard label="Average price" icon={Tag} value={money(summary.data.avg_price)} />
+        <StatCard label="Median price" icon={Scale} value={money(summary.data.median_price)} />
+        <StatCard label="Price range" icon={ArrowLeftRight} value={`${money(summary.data.min_price)} – ${money(summary.data.max_price)}`} />
+        <StatCard label="Avg $ / sq ft" icon={Ruler} value={money(summary.data.avg_price_per_sqft)} />
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
         {!segments.ok ? <ErrorState message={segments.error} /> : <SegmentChart data={segments.data} by={by} />}

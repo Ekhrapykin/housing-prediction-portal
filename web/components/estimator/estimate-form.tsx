@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, Wand2 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -68,6 +68,7 @@ export function EstimateForm() {
                 {create.isPending ? "Estimating…" : "Estimate price"}
               </Button>
               <Button type="button" variant="outline" onClick={() => form.reset({ ...EXAMPLE, label: form.getValues("label") })}>
+                <Wand2 aria-hidden />
                 Fill example
               </Button>
             </div>
