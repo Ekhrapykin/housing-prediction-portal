@@ -1,12 +1,13 @@
 import httpx
+from asgi_correlation_id import correlation_id
 
-from app.errors import UpstreamError, UpstreamUnavailable, UpstreamValidationError
-from app.request_id import HEADER, current_request_id
+from app.core.errors import UpstreamError, UpstreamUnavailable, UpstreamValidationError
+from app.core.logging import HEADER
 
 
 def _trace_headers() -> dict[str, str]:
     """Forward the current request's id so ml-api logs the same one."""
-    rid = current_request_id()
+    rid = correlation_id.get()
     return {HEADER: rid} if rid else {}
 
 

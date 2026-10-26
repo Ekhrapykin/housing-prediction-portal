@@ -5,7 +5,7 @@
 ```mermaid
 flowchart LR
   C[client] --> R[api/ routers]
-  R --> D[deps.py]
+  R --> D[api/deps.py]
   D --> S[services/predictor.py]
   L[lifespan] --> T[ml/train.py: train]
   T --> CSV[(DATA_PATH<br/>/data/house_prices.csv, mounted)]
@@ -17,8 +17,8 @@ flowchart LR
 | Routes | `app/api/*.py` | HTTP only: parse, call the predictor, return. No ML code. |
 | Schemas | `app/schemas.py` | Pydantic validation and bounds. The service's own definition of the request contract; `tests/test_contract.py` pins it to `contracts/house-features.schema.json`. |
 | Service | `app/services/predictor.py` | `Predictor` wraps the fitted pipeline and the model card; builds the DataFrame, predicts, computes warnings. Knows nothing about HTTP. |
-| Deps | `app/deps.py` | Hands the predictor from `app.state` to routes (`PredictorDep`). |
-| Config | `app/config.py` | `Settings` via pydantic-settings, cached with `lru_cache`. |
+| Deps | `app/api/deps.py` | Hands the predictor from `app.state` to routes (`PredictorDep`). |
+| Core | `app/core/config.py`, `app/core/logging.py` | `Settings` via pydantic-settings, cached with `lru_cache`; request-id and access-log setup. Imports nothing from the other layers. |
 | ML | `app/ml/` | `train.py` has `train(data_path)`, which `lifespan` calls at startup, plus the feature list (derived from `HouseFeatures`) and the target. |
 
 There is no repository layer: the only input is one read-only CSV.
@@ -66,7 +66,7 @@ ml-api registers no custom handler. FastAPI's default 422 body is `{"detail": [ 
 
 ## Request id and logs
 
-`RequestIdMiddleware` (`app/request_id.py`, pure ASGI) takes a valid `X-Request-ID` from the caller or generates a UUID4, keeps it in a `ContextVar`, sets it on the response and logs one line per request. A log `Filter` adds it to every record (`[req=%(request_id)s]`, `-` outside a request). Uvicorn's access log is disabled in favour of the middleware line. The file is identical in estimator-api.
+`asgi-correlation-id`'s `CorrelationIdMiddleware` (wired in `app/core/logging.py`) takes an `X-Request-ID` from the caller if it matches `^[A-Za-z0-9-]{1,64}$` (our `validator`) or generates a UUID4, keeps it in `correlation_id`, and echoes it in the response. The library's `CorrelationIdFilter` adds it to every record (`[req=%(correlation_id)s]`, `-` outside a request). A tiny pure-ASGI `AccessLogMiddleware`, added first so it runs inside the correlation one, logs `METHOD path -> status (ms)` and skips `/health`. Uvicorn's access log is disabled in favour of it. `app/core/logging.py` is identical in estimator-api.
 
 ## Data and persistence
 

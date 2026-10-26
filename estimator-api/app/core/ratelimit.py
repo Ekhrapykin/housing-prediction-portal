@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 
-from app.config import get_settings
+from app.core.config import get_settings
 
 def write_limit() -> str:
     return get_settings().rate_limit_writes

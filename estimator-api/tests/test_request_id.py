@@ -1,9 +1,9 @@
 import re
 
 import httpx
+from asgi_correlation_id import correlation_id
 
 from app.clients.ml import MlClient
-from app.request_id import request_id_var
 from tests.test_estimates_api import BODY
 
 UUID4 = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
@@ -37,10 +37,10 @@ def test_ml_client_forwards_current_id():
         return httpx.Response(200, json={"price": 1.0, "warnings": []})
 
     ml = MlClient(httpx.Client(base_url="http://ml", transport=httpx.MockTransport(handler)), 1.0)
-    token = request_id_var.set("fwd-1")
+    token = correlation_id.set("fwd-1")
     try:
         ml.predict({})
     finally:
-        request_id_var.reset(token)
+        correlation_id.reset(token)
     ml.predict({})  # no current request: nothing to forward
     assert seen == ["fwd-1", None]

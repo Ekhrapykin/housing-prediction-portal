@@ -1,11 +1,11 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config import get_settings
-from app.deps import get_ml_client
-from app.errors import UpstreamUnavailable
+from app.core.config import get_settings
+from app.api.deps import get_ml_client
+from app.core.errors import UpstreamUnavailable
 from app.main import create_app
-from app.ratelimit import limiter
+from app.core.ratelimit import limiter
 
 
 class FakeMlClient:

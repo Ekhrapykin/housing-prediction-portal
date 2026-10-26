@@ -3,9 +3,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api import health, model_info, predictions
-from app.config import get_settings
+from app.core.config import get_settings
 from app.ml.train import train
-from app.request_id import RequestIdMiddleware, configure_logging
+from app.core.logging import add_request_middleware, configure_logging
 from app.services.predictor import Predictor
 
 
@@ -25,7 +25,7 @@ def create_app() -> FastAPI:
         description="Ridge regression trained on the provided housing dataset.",
         lifespan=lifespan,
     )
-    app.add_middleware(RequestIdMiddleware)
+    add_request_middleware(app)
     for module in (health, predictions, model_info):
         app.include_router(module.router)
     return app

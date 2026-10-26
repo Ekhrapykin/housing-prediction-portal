@@ -41,11 +41,11 @@ In `docker-compose.yml` it gets `ML_API_URL=http://ml-api:${ML_API_PORT:-8000}` 
 
 ## Configuration
 
-Read by `app/config.py` (env var = upper-cased field name).
+Read by `app/core/config.py` (env var = upper-cased field name).
 
 | Env var | Default | Purpose |
 |---|---|---|
-| `PORT` | `8001` (set in the image) | Listen port of the Docker image (`CMD` runs `uvicorn --port ${PORT}`); not read by `app/config.py`. Compose sets it from `ESTIMATOR_API_PORT` |
+| `PORT` | `8001` (set in the image) | Listen port of the Docker image (`CMD` runs `uvicorn --port ${PORT}`); not read by `app/core/config.py`. Compose sets it from `ESTIMATOR_API_PORT` |
 | `ML_API_URL` | `http://localhost:8000` | Base URL of ml-api |
 | `ML_API_TIMEOUT` | `5.0` | Seconds, for the pooled httpx client |
 | `ML_API_HEALTH_TIMEOUT` | `2.0` | Seconds, for the ml-api probe in `/health` (kept short so `/health` never hangs) |
@@ -64,9 +64,9 @@ Read by `app/config.py` (env var = upper-cased field name).
 | GET | `/health` | Liveness | `{"status":"ok","ml_api":"up"\|"down"}`; always 200 |
 | GET | `/model-info` | ml-api's model card, passed through | 502/503 as above |
 
-Rate limiting: only `POST` and `DELETE /estimates` are limited (`RATE_LIMIT_WRITES`); the 429 body is `{"detail": "Too many requests. Try again in N seconds."}` with a `Retry-After` header. The client is the TCP peer, or the right-most `X-Forwarded-For` entry when the peer is in `TRUSTED_PROXIES` (details in `app/ratelimit.py` and the root [ARCHITECTURE.md](../ARCHITECTURE.md#rate-limiting)). Counters are in-memory per process. The published `:8001` is limited too, keyed by the peer.
+Rate limiting: only `POST` and `DELETE /estimates` are limited (`RATE_LIMIT_WRITES`); the 429 body is `{"detail": "Too many requests. Try again in N seconds."}` with a `Retry-After` header. The client is the TCP peer, or the right-most `X-Forwarded-For` entry when the peer is in `TRUSTED_PROXIES` (details in `app/core/ratelimit.py` and the root [ARCHITECTURE.md](../ARCHITECTURE.md#rate-limiting)). Counters are in-memory per process. The published `:8001` is limited too, keyed by the peer.
 
-Request ids ([contract](../ARCHITECTURE.md#request-correlation)): `X-Request-ID` is read or generated, echoed in the response, put on every log line as `[req=...]` and forwarded to ml-api. The middleware logs one line per request (method, path, status, ms) and uvicorn's own access log is turned off to avoid duplicates.
+Request ids ([contract](../ARCHITECTURE.md#request-correlation)): `X-Request-ID` is read or generated, echoed in the response, put on every log line as `[req=...]` and forwarded to ml-api. An access-log middleware logs one line per request (method, path, status, ms; not `/health`) and uvicorn's own access log is turned off to avoid duplicates.
 
 All errors have the shape `{"detail": ...}`; see the [error contract](../ARCHITECTURE.md#errors).
 
@@ -88,16 +88,11 @@ cd estimator-api && uv sync && uv run pytest -q
 estimator-api/
 ├── app/
 │   ├── main.py            # create_app(), lifespan: engine + init_db + pooled httpx.Client
-│   ├── config.py          # Settings
-│   ├── db.py              # ORM model (EstimateRow), engine and sessionmaker, init_db, get_session (request-scoped Session)
-│   ├── deps.py            # get_ml_client, get_estimate_service (builds the repo on the Session), *Dep aliases
-│   ├── errors.py          # AppError hierarchy + {detail} handler
-│   ├── ratelimit.py       # slowapi limiter, client_key (trusted-proxy XFF), 429 handler
-│   ├── request_id.py      # X-Request-ID middleware, log filter and format
+│   ├── core/              # config.py (Settings), errors.py (AppError + {detail} handler), ratelimit.py (slowapi, client_key, 429 handler), logging.py (asgi-correlation-id setup, access log)
 │   ├── schemas.py         # HouseFeatures, EstimateRequest, Estimate
-│   ├── api/               # estimates.py, health.py (routers)
+│   ├── api/               # estimates.py, health.py (routers), deps.py (get_ml_client, get_estimate_service, *Dep aliases)
 │   ├── services/estimates.py      # EstimateService (orchestration)
-│   ├── repositories/estimates.py  # EstimateRepository (SQLAlchemy queries on a Session)
+│   ├── repositories/      # estimates.py (EstimateRepository), db.py (ORM model EstimateRow, engine, sessionmaker, init_db, get_session)
 │   └── clients/ml.py      # MlClient (httpx, error translation)
 ├── tests/                 # conftest.py (FakeMlClient), API, service and contract tests
 ├── Dockerfile

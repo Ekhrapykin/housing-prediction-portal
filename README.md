@@ -126,7 +126,7 @@ Target: any Docker host (VPS, home server, cloud VM), amd64 Linux. The compose m
 2. **Self-hosted runner:** repo Settings -> Actions -> Runners -> New self-hosted runner -> Linux -> x64. Run the shown commands on the host, add the label `deploy`, then `sudo ./svc.sh install && sudo ./svc.sh start`.
 3. **Fork PR guard:** Settings -> Actions -> General -> enable "Require approval for outside collaborators". A self-hosted runner on a public repo must not run strangers' code (deploy only runs on `main` pushes; this is a second guard).
 4. **GHCR visibility:** after the first push, make each `hpp-*` package public so the host can pull without a login.
-5. **Expose the portal** (only `WEB_PORT`, default 3000) through a reverse proxy (Caddy, nginx) or a tunnel (`tailscale funnel 3000`, Cloudflare Tunnel to `http://localhost:3000`). The backend ports are published for Swagger demos; firewall them or drop their `ports:` in compose.
+5. **Expose the portal** (only `WEB_PORT`, default 3000) through a reverse proxy (Caddy, nginx) or a tunnel (Cloudflare Tunnel to `http://localhost:3000`). The portal must sit behind a reverse proxy or tunnel that appends the client IP to `X-Forwarded-For` (nginx, Caddy, Traefik, Cloudflare and similar); exposing `web` directly lets a client pick its own rate-limit key. The backend ports are published for Swagger demos; firewall them or drop their `ports:` in compose.
 
 Manual deploy, from a checkout of the repo (compose bind-mounts `./data/house_prices.csv` and `./data/postgres/init`): `docker compose pull && docker compose up -d --no-build`.
 

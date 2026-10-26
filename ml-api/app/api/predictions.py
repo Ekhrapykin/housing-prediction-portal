@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body
 
-from app.deps import PredictorDep
+from app.api.deps import PredictorDep
 from app.schemas import BatchPrediction, HouseFeatures, Prediction
 
 MAX_BATCH_SIZE = 1000  # market-api sends at most 50 variants per what-if; this only bounds request size

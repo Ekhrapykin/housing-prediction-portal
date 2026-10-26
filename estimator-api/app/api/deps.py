@@ -4,7 +4,7 @@ from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from app.clients.ml import MlClient
-from app.db import get_session
+from app.repositories.db import get_session
 from app.repositories.estimates import EstimateRepository
 from app.services.estimates import EstimateService
 

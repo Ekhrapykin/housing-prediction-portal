@@ -8,7 +8,7 @@ flowchart LR
   S --> Repo[repositories/] --> DB[(SQLite locally<br/>Postgres schema estimator in Docker)]
   S --> C[clients/ml.py] --> ML[ml-api]
   R -.uses.-> Sch[schemas.py]
-  R -.Depends.-> D[deps.py]
+  R -.Depends.-> D[api/deps.py]
 ```
 
 | Layer | Module | Rule |
@@ -18,10 +18,10 @@ flowchart LR
 | Repository | `app/repositories/estimates.py` | The only place that queries the database; maps `EstimateRow` to `Estimate`. Takes a SQLAlchemy `Session`. |
 | Client | `app/clients/ml.py` | The only place that talks to ml-api; turns HTTP failures into domain errors. |
 | Schemas | `app/schemas.py` | Request and response models. |
-| Errors | `app/errors.py` | `AppError` hierarchy and one handler. |
-| Rate limit | `app/ratelimit.py` | slowapi `Limiter`, `client_key`, trusted-proxy resolution, the 429 handler. Routes opt in with `@limiter.shared_limit`. |
-| Request id | `app/request_id.py` | Pure ASGI middleware, `ContextVar`, log `Filter`, log format. `MlClient` reads the `ContextVar` and forwards the id. |
-| Config / deps / db | `config.py`, `deps.py`, `db.py` | Settings, wiring, the ORM model and the `Session` dependency. `deps.py` is the composition root: it builds a service per request. |
+| Errors | `app/core/errors.py` | `AppError` hierarchy and one handler. |
+| Rate limit | `app/core/ratelimit.py` | slowapi `Limiter`, `client_key`, trusted-proxy resolution, the 429 handler. Routes opt in with `@limiter.shared_limit`. |
+| Request id | `app/core/logging.py` | `asgi-correlation-id` middleware and log filter, our id validator, the access-log middleware and the log format. `MlClient` reads `correlation_id.get()` and forwards the id. |
+| Config / deps / db | `core/config.py`, `api/deps.py`, `repositories/db.py` | Settings, wiring, the ORM model and the `Session` dependency. `api/deps.py` is the composition root: it builds a service per request. `core/` imports nothing from `api/`, `services/`, `repositories/` or `clients/`. |
 
 Because the service takes plain collaborators, `test_estimate_service.py` runs it without FastAPI.
 
@@ -65,7 +65,7 @@ Every failure is rendered as `{"detail": ...}`, the same contract the other serv
 
 ## Data and persistence
 
-SQLAlchemy 2.x with the typed declarative style (`DeclarativeBase`, `Mapped[...]`, `mapped_column`), one table, `EstimateRow` in `db.py`:
+SQLAlchemy 2.x with the typed declarative style (`DeclarativeBase`, `Mapped[...]`, `mapped_column`), one table, `EstimateRow` in `repositories/db.py`:
 
 `estimates(id INTEGER PK, label TEXT NULL, features JSON, price FLOAT, warnings JSON, created_at TEXT)`
 
@@ -81,7 +81,7 @@ SQLAlchemy 2.x with the typed declarative style (`DeclarativeBase`, `Mapped[...]
 
 `POST` and `DELETE /estimates` share one slowapi budget per client (`RATE_LIMIT_WRITES`, default `20/minute`); the 429 is `{"detail": ...}` plus `Retry-After`. The client key is the TCP peer, or the right-most `X-Forwarded-For` entry when the peer is one of `TRUSTED_PROXIES` (resolved to IPs on each write request, so a recreated `web` container is still recognised). Rationale and trust model: root [ARCHITECTURE.md](../ARCHITECTURE.md#rate-limiting). Storage is slowapi's in-memory default, so counters are per process.
 
-`RequestIdMiddleware` stores a valid incoming `X-Request-ID` (or a new UUID4) in a `ContextVar`, sets it on the response and logs one line per request. FastAPI copies the context into its threadpool, so sync routes and `MlClient` see it. Uvicorn's access log is disabled in `configure_logging()`; the middleware line replaces it (it adds the id and the duration).
+`CorrelationIdMiddleware` from `asgi-correlation-id` (configured in `app/core/logging.py`) keeps a valid incoming `X-Request-ID` (`^[A-Za-z0-9-]{1,64}$`, our `validator`) or a new UUID4 in `correlation_id` and echoes it in the response. FastAPI copies the context into its threadpool, so sync routes and `MlClient` see it. A small `AccessLogMiddleware` (inside the correlation one, so it sees the id) logs one line per request, skipping `/health`. Uvicorn's access log is disabled in `configure_logging()`; the middleware line replaces it (it adds the id and the duration).
 
 ## Testing seams
 

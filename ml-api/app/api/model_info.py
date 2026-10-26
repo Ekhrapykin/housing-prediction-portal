@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.deps import PredictorDep
+from app.api.deps import PredictorDep
 
 router = APIRouter(tags=["model"])
 

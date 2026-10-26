@@ -39,15 +39,15 @@ The image holds no data and no model: the CSV comes from a read-only file mount 
 
 ## Configuration
 
-Read by `app/config.py` (pydantic-settings, env var = upper-cased field name).
+Read by `app/core/config.py` (pydantic-settings, env var = upper-cased field name).
 
 | Env var | Default | Purpose |
 |---|---|---|
-| `PORT` | `8000` (set in the image) | Listen port of the Docker image (`CMD` runs `uvicorn --port ${PORT}`); not read by `app/config.py`. Compose sets it from `ML_API_PORT` |
+| `PORT` | `8000` (set in the image) | Listen port of the Docker image (`CMD` runs `uvicorn --port ${PORT}`); not read by `app/core/config.py`. Compose sets it from `ML_API_PORT` |
 | `DATA_PATH` | `../data/house_prices.csv` (repo root; `/data/house_prices.csv` in Docker) | Training CSV, read at startup (UTF-8 with BOM is handled) |
 | `MODEL_ALPHA` | `10.0` | Ridge strength. Fixed, not cross-validated, so coefficients stay interpretable on collinear features (see [limitations](../ARCHITECTURE.md#limitations-and-future-work)) |
 
-Every request gets an `X-Request-ID` (a valid incoming one, matching `^[A-Za-z0-9-]{1,64}$`, or a generated UUID4), echoed in the response and shown on each log line as `[req=...]`. The middleware logs one line per request and uvicorn's access log is disabled to avoid duplicates. No configuration.
+Every request gets an `X-Request-ID` (a valid incoming one, matching `^[A-Za-z0-9-]{1,64}$`, or a generated UUID4), echoed in the response and shown on each log line as `[req=...]`. `asgi-correlation-id` does the echo; an access-log middleware logs one line per request (not `/health`) and uvicorn's access log is disabled to avoid duplicates. No configuration.
 
 ## API
 
@@ -85,10 +85,9 @@ cd ml-api && uv sync && uv run pytest -q
 ml-api/
 ├── app/
 │   ├── main.py            # create_app(), lifespan trains the Predictor into app.state
-│   ├── config.py          # Settings (data_path, model_alpha)
-│   ├── deps.py            # get_predictor / PredictorDep
+│   ├── core/              # config.py (Settings: data_path, model_alpha), logging.py (asgi-correlation-id setup, access log)
 │   ├── schemas.py         # HouseFeatures, Prediction, BatchPrediction
-│   ├── api/               # health.py, predictions.py, model_info.py (routers)
+│   ├── api/               # health.py, predictions.py, model_info.py (routers), deps.py (get_predictor / PredictorDep)
 │   ├── services/predictor.py  # Predictor: predict, extrapolation warnings
 │   └── ml/                # train.py (train(); FEATURES, TARGET, CV_FOLDS, CV_RANDOM_STATE constants)
 ├── tests/                 # conftest.py, test_api.py, test_request_id.py, test_contract.py

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
-from app.deps import EstimateServiceDep
-from app.ratelimit import limiter, write_limit
+from app.api.deps import EstimateServiceDep
+from app.core.ratelimit import limiter, write_limit
 from app.schemas import Estimate, EstimateRequest
 
 DEFAULT_LIMIT = 50  # the history view shows recent estimates, not everything

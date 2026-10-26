@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.db import EstimateRow
+from app.repositories.db import EstimateRow
 from app.schemas import Estimate
 
 

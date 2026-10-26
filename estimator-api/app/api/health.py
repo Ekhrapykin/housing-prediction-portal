@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.deps import MlClientDep
+from app.api.deps import MlClientDep
 
 router = APIRouter()
 

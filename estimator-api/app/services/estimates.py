@@ -1,5 +1,5 @@
 from app.clients.ml import MlClient
-from app.errors import NotFoundError
+from app.core.errors import NotFoundError
 from app.repositories.estimates import EstimateRepository
 from app.schemas import Estimate, EstimateRequest
 

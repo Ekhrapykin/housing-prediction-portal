@@ -1,8 +1,8 @@
 import pytest
 from sqlalchemy.orm import Session
 
-from app.db import init_db, make_engine
-from app.errors import NotFoundError
+from app.repositories.db import init_db, make_engine
+from app.core.errors import NotFoundError
 from app.repositories.estimates import EstimateRepository
 from app.schemas import EstimateRequest
 from app.services.estimates import EstimateService
