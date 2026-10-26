@@ -1,8 +1,8 @@
 import pytest
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.repositories.db import init_db, make_engine
-from app.core.errors import NotFoundError
 from app.repositories.estimates import EstimateRepository
 from app.schemas import EstimateRequest
 from app.services.estimates import EstimateService
@@ -18,6 +18,7 @@ def test_service_create_get_delete_without_fastapi(tmp_path):
     est = service.create(EstimateRequest(**BODY))
     assert service.get(est.id).price == 250_000.0
     service.delete(est.id)
-    with pytest.raises(NotFoundError):
+    with pytest.raises(HTTPException) as exc:
         service.get(est.id)
+    assert exc.value.status_code == 404
     session.close()

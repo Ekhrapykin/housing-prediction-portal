@@ -20,10 +20,6 @@ QUIET_PATHS = frozenset({"/health"})
 access_log = logging.getLogger("app.access")
 
 
-def is_valid_id(value: str) -> bool:
-    return VALID_ID.fullmatch(value) is not None
-
-
 class AccessLogMiddleware:
     """Pure ASGI. Runs inside the correlation middleware, so the id is on the log line."""
 
@@ -63,5 +59,5 @@ def add_request_middleware(app: FastAPI) -> None:
     # add_middleware makes the last one added the outermost: correlation wraps the access log, so the log sees the id.
     app.add_middleware(AccessLogMiddleware)
     app.add_middleware(
-        CorrelationIdMiddleware, header_name=HEADER, validator=is_valid_id, generator=lambda: str(uuid4())
+        CorrelationIdMiddleware, header_name=HEADER, validator=VALID_ID.fullmatch, generator=lambda: str(uuid4())
     )

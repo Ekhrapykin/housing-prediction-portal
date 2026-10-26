@@ -14,7 +14,7 @@ def test_predict_single_is_plausible(client):
 
 def test_predict_batch(client):
     r = client.post("/predict/batch", json=[EXAMPLE, EXAMPLE])
-    assert r.json()["count"] == 2
+    assert len(r.json()["predictions"]) == 2
 
 
 def test_empty_batch_rejected(client):

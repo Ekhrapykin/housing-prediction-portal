@@ -39,7 +39,7 @@ class MlClientTest {
     void returnsPricesInOrder() {
         server.expect(requestTo("http://ml/predict/batch")).andExpect(method(HttpMethod.POST))
                 .andRespond(withSuccess("""
-                        {"count":2,"predictions":[{"price":100.5,"warnings":[]},{"price":200,"warnings":["x"]}]}""",
+                        {"predictions":[{"price":100.5,"warnings":[]},{"price":200,"warnings":["x"]}]}""",
                         MediaType.APPLICATION_JSON));
         assertThat(client.predictBatch(List.of(Map.of("a", 1), Map.of("a", 2)))).containsExactly(100.5, 200.0);
     }
@@ -109,7 +109,7 @@ class MlClientTest {
         MDC.put("requestId", "abc-123");
         server.expect(requestTo("http://ml/predict/batch")).andExpect(header("X-Request-ID", "abc-123"))
                 .andRespond(withSuccess("""
-                        {"count":1,"predictions":[{"price":1,"warnings":[]}]}""", MediaType.APPLICATION_JSON));
+                        {"predictions":[{"price":1,"warnings":[]}]}""", MediaType.APPLICATION_JSON));
         client.predictBatch(List.of(Map.of("a", 1)));
         server.verify();
     }

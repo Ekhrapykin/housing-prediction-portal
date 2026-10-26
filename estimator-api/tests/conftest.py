@@ -1,9 +1,9 @@
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
 from app.api.deps import get_ml_client
-from app.core.errors import UpstreamUnavailable
 from app.main import create_app
 from app.core.ratelimit import limiter
 
@@ -16,7 +16,7 @@ class FakeMlClient:
     def predict(self, features: dict) -> dict:
         self.calls += 1
         if self.fail:
-            raise UpstreamUnavailable()
+            raise HTTPException(503, "Prediction service is unavailable")
         return {"price": 250_000.0, "warnings": []}
 
     def model_info(self) -> dict:

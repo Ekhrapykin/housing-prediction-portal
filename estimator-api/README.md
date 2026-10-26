@@ -88,7 +88,7 @@ cd estimator-api && uv sync && uv run pytest -q
 estimator-api/
 ├── app/
 │   ├── main.py            # create_app(), lifespan: engine + init_db + pooled httpx.Client
-│   ├── core/              # config.py (Settings), errors.py (AppError + {detail} handler), ratelimit.py (slowapi, client_key, 429 handler), logging.py (asgi-correlation-id setup, access log)
+│   ├── core/              # config.py (Settings), ratelimit.py (slowapi, client_key, 429 handler), logging.py (asgi-correlation-id setup, access log)
 │   ├── schemas.py         # HouseFeatures, EstimateRequest, Estimate
 │   ├── api/               # estimates.py, health.py (routers), deps.py (get_ml_client, get_estimate_service, *Dep aliases)
 │   ├── services/estimates.py      # EstimateService (orchestration)

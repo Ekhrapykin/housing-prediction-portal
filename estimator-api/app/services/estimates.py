@@ -1,5 +1,6 @@
+from fastapi import HTTPException
+
 from app.clients.ml import MlClient
-from app.core.errors import NotFoundError
 from app.repositories.estimates import EstimateRepository
 from app.schemas import Estimate, EstimateRequest
 
@@ -15,7 +16,7 @@ class EstimateService:
 
     def get(self, estimate_id: int) -> Estimate:
         if (est := self._repo.get(estimate_id)) is None:
-            raise NotFoundError("Estimate not found")
+            raise HTTPException(404, "Estimate not found")
         return est
 
     def list(self, ids: list[int] | None, limit: int) -> list[Estimate]:
@@ -23,4 +24,4 @@ class EstimateService:
 
     def delete(self, estimate_id: int) -> None:
         if not self._repo.delete(estimate_id):
-            raise NotFoundError("Estimate not found")
+            raise HTTPException(404, "Estimate not found")

@@ -20,5 +20,4 @@ def predict_batch(
     houses: Annotated[list[HouseFeatures], Body(min_length=1, max_length=MAX_BATCH_SIZE)],
     predictor: PredictorDep,
 ):
-    predictions = predictor.predict(houses)
-    return BatchPrediction(count=len(predictions), predictions=predictions)
+    return BatchPrediction(predictions=predictor.predict(houses))

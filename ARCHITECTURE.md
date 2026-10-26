@@ -58,7 +58,7 @@ Every service follows these. The schema contracts themselves (files, rule, contr
 Every non-2xx response carries a JSON body with `detail`.
 
 - `detail` is a **string** everywhere, except FastAPI validation errors (422), where it is a **list of `{loc, msg, type}`**.
-- Python services (ml-api, estimator-api) answer validation failures with **422**; the Java service (market-api) answers with **400** (`ProblemDetail`, which has `detail`). estimator-api uses an `AppError` handler, ml-api FastAPI's defaults.
+- Python services (ml-api, estimator-api) answer validation failures with **422**; the Java service (market-api) answers with **400** (`ProblemDetail`, which has `detail`). Both rely on FastAPI's default handlers (estimator-api raises `HTTPException`).
 - market-api validation messages name fields by their snake_case JSON path (`base.square_footage`), like the Python services' `loc`.
 - Status 429 (estimator-api writes) also carries `Retry-After`.
 - Clients must accept both shapes; the portal's `readDetail` (`web/lib/clients/errors.ts`, used by both its browser and server transports) turns the list into a readable `field: message` string.

@@ -24,5 +24,4 @@ class Prediction(BaseModel):
 
 
 class BatchPrediction(BaseModel):
-    count: int
     predictions: list[Prediction]

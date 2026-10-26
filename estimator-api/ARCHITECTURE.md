@@ -18,7 +18,6 @@ flowchart LR
 | Repository | `app/repositories/estimates.py` | The only place that queries the database; maps `EstimateRow` to `Estimate`. Takes a SQLAlchemy `Session`. |
 | Client | `app/clients/ml.py` | The only place that talks to ml-api; turns HTTP failures into domain errors. |
 | Schemas | `app/schemas.py` | Request and response models. |
-| Errors | `app/core/errors.py` | `AppError` hierarchy and one handler. |
 | Rate limit | `app/core/ratelimit.py` | slowapi `Limiter`, `client_key`, trusted-proxy resolution, the 429 handler. Routes opt in with `@limiter.shared_limit`. |
 | Request id | `app/core/logging.py` | `asgi-correlation-id` middleware and log filter, our id validator, the access-log middleware and the log format. `MlClient` reads `correlation_id.get()` and forwards the id. |
 | Config / deps / db | `core/config.py`, `api/deps.py`, `repositories/db.py` | Settings, wiring, the ORM model and the `Session` dependency. `api/deps.py` is the composition root: it builds a service per request. `core/` imports nothing from `api/`, `services/`, `repositories/` or `clients/`. |
@@ -53,15 +52,15 @@ The validated request is checked here and again by ml-api. A 422 from ml-api is 
 
 Every failure is rendered as `{"detail": ...}`, the same contract the other services use.
 
-| Exception | Status | When |
+| Raised | Status | When |
 |---|---|---|
-| `NotFoundError` | 404 | unknown estimate id |
-| `UpstreamValidationError` | 422 | ml-api answered 422; its `detail` is forwarded |
-| `UpstreamError` | 502 | ml-api answered any other error status |
-| `UpstreamUnavailable` | 503 | connect or timeout failure (any `httpx.HTTPError`) |
+| `HTTPException(404)` | 404 | unknown estimate id |
+| `HTTPException(422)` | 422 | ml-api answered 422; its `detail` is forwarded |
+| `HTTPException(502)` | 502 | ml-api answered any other error status |
+| `HTTPException(503)` | 503 | connect or timeout failure (any `httpx.HTTPError`) |
 | FastAPI `RequestValidationError` | 422 | our own request validation; default body, `detail` is a list |
 
-`app_error_handler` is registered for `AppError`, so adding an error is a subclass with a `status_code`. `MlClient._request` is the single translation point.
+FastAPI's own `HTTPException` handler renders these, so there is no custom error hierarchy. `MlClient._request` is the single translation point for ml-api failures.
 
 ## Data and persistence
 

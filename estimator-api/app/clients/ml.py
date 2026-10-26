@@ -1,7 +1,7 @@
 import httpx
 from asgi_correlation_id import correlation_id
+from fastapi import HTTPException
 
-from app.core.errors import UpstreamError, UpstreamUnavailable, UpstreamValidationError
 from app.core.logging import HEADER
 
 
@@ -32,9 +32,9 @@ class MlClient:
         try:
             r = self._http.request(method, path, headers=_trace_headers(), **kwargs)
         except httpx.HTTPError as e:
-            raise UpstreamUnavailable() from e
+            raise HTTPException(503, "Prediction service is unavailable") from e
         if r.status_code == 422:
-            raise UpstreamValidationError(r.json()["detail"])
+            raise HTTPException(422, r.json()["detail"])
         if r.is_error:
-            raise UpstreamError()
+            raise HTTPException(502, "Prediction service returned an error")
         return r.json()
