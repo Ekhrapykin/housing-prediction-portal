@@ -1,5 +1,6 @@
-# Laptop: docker compose up --build
-# Pi:     docker compose pull && docker compose up -d --no-build
+# Local:  docker compose up --build
+# Host:   docker compose pull && docker compose up -d --no-build
+# Host ports come from .env (ML_API_PORT, ESTIMATOR_API_PORT, MARKET_API_PORT, WEB_PORT); defaults below.
 x-common: &common
   restart: unless-stopped
 
@@ -20,7 +21,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_demo}
       ESTIMATOR_DB_PASSWORD: ${ESTIMATOR_DB_PASSWORD:-estimator_demo}
       MARKET_DB_PASSWORD: ${MARKET_DB_PASSWORD:-market_demo}
-    # Small-memory settings for a 4 GB Pi.
+    # Small-memory settings: the stack's limits are sized to fit a small 2-4 GB host.
     command:
       - postgres
       - -c
@@ -47,14 +48,15 @@ services:
     build: ./ml-api
     image: ghcr.io/ekhrapykin/hpp-ml-api:${TAG:-latest}
     # Published so Swagger (/docs) can be shown live.
-    ports: ["8000:8000"]
+    ports: ["${ML_API_PORT:-8000}:${ML_API_PORT:-8000}"]
     environment:
+      PORT: ${ML_API_PORT:-8000}
       DATA_PATH: /data/house_prices.csv
     volumes: ["./data/house_prices.csv:/data/house_prices.csv:ro"]
     mem_limit: 512m
     healthcheck:
       <<: *healthcheck
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${ML_API_PORT:-8000}/health')"]
       start_period: 30s # trains the model at startup
 
   estimator-api:
@@ -62,10 +64,11 @@ services:
     build: ./estimator-api
     image: ghcr.io/ekhrapykin/hpp-estimator-api:${TAG:-latest}
     # Published for Swagger demos; the portal reaches it over the compose network, so drop this in a locked-down setup.
-    # The write rate limiter still applies on :8001, keyed by the TCP peer, because only `web` is trusted for X-Forwarded-For.
-    ports: ["8001:8001"]
+    # The write rate limiter still applies on this port, keyed by the TCP peer, because only `web` is trusted for X-Forwarded-For.
+    ports: ["${ESTIMATOR_API_PORT:-8001}:${ESTIMATOR_API_PORT:-8001}"]
     environment:
-      ML_API_URL: http://ml-api:8000
+      PORT: ${ESTIMATOR_API_PORT:-8001}
+      ML_API_URL: http://ml-api:${ML_API_PORT:-8000}
       TRUSTED_PROXIES: web # same as the default; whose X-Forwarded-For the rate limiter believes
       DATABASE_URL: postgresql+psycopg://estimator:${ESTIMATOR_DB_PASSWORD:-estimator_demo}@postgres:5432/housing
     mem_limit: 256m
@@ -74,16 +77,17 @@ services:
       postgres: { condition: service_healthy }
     healthcheck:
       <<: *healthcheck
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${ESTIMATOR_API_PORT:-8001}/health')"]
 
   market-api:
     <<: *common
     build: ./market-api
     image: ghcr.io/ekhrapykin/hpp-market-api:${TAG:-latest}
     # Published for Swagger demos (/swagger-ui.html); the portal uses the compose network.
-    ports: ["8080:8080"]
+    ports: ["${MARKET_API_PORT:-8080}:${MARKET_API_PORT:-8080}"]
     environment:
-      ML_API_URL: http://ml-api:8000
+      PORT: ${MARKET_API_PORT:-8080}
+      ML_API_URL: http://ml-api:${ML_API_PORT:-8000}
       SPRING_PROFILES_ACTIVE: docker
       MARKET_DB_PASSWORD: ${MARKET_DB_PASSWORD:-market_demo}
       DATA_PATH: /data/house_prices.csv
@@ -95,7 +99,7 @@ services:
     healthcheck:
       <<: *healthcheck
       # temurin JRE images ship curl.
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:${MARKET_API_PORT:-8080}/actuator/health"]
       start_period: 40s # JVM + Spring startup
 
   web:
@@ -103,20 +107,21 @@ services:
     build:
       context: ./web
       args:
-        ESTIMATOR_API_URL: http://estimator-api:8001
-        MARKET_API_URL: http://market-api:8080
+        ESTIMATOR_API_URL: http://estimator-api:${ESTIMATOR_API_PORT:-8001}
+        MARKET_API_URL: http://market-api:${MARKET_API_PORT:-8080}
     image: ghcr.io/ekhrapykin/hpp-web:${TAG:-latest}
-    ports: ["3000:3000"]
+    ports: ["${WEB_PORT:-3000}:${WEB_PORT:-3000}"]
     environment:
-      ESTIMATOR_API_URL: http://estimator-api:8001
-      MARKET_API_URL: http://market-api:8080
+      PORT: ${WEB_PORT:-3000}
+      ESTIMATOR_API_URL: http://estimator-api:${ESTIMATOR_API_PORT:-8001}
+      MARKET_API_URL: http://market-api:${MARKET_API_PORT:-8080}
     mem_limit: 384m
     depends_on:
       estimator-api: { condition: service_healthy }
       market-api: { condition: service_healthy }
     healthcheck:
       <<: *healthcheck
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:${WEB_PORT:-3000}/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       timeout: 5s # node cold-start + SSR of /
 
 volumes:

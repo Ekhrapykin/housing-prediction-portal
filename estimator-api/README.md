@@ -37,7 +37,7 @@ docker build -t hpp-estimator-api estimator-api
 docker run --rm -p 8001:8001 -e ML_API_URL=http://host.docker.internal:8000 hpp-estimator-api   # SQLite inside the container (lost on exit)
 ```
 
-In `docker-compose.yml` it gets `ML_API_URL=http://ml-api:8000` and `DATABASE_URL=postgresql+psycopg://estimator:...@postgres:5432/housing` (data lives in the `postgres-data` volume), waits for `ml-api` and `postgres` to be healthy, and is published on `8001` for Swagger demos.
+In `docker-compose.yml` it gets `ML_API_URL=http://ml-api:${ML_API_PORT:-8000}` and `DATABASE_URL=postgresql+psycopg://estimator:...@postgres:5432/housing` (data lives in the `postgres-data` volume), waits for `ml-api` and `postgres` to be healthy, and is published on `8001` for Swagger demos.
 
 ## Configuration
 
@@ -45,6 +45,7 @@ Read by `app/config.py` (env var = upper-cased field name).
 
 | Env var | Default | Purpose |
 |---|---|---|
+| `PORT` | `8001` (set in the image) | Listen port of the Docker image (`CMD` runs `uvicorn --port ${PORT}`); not read by `app/config.py`. Compose sets it from `ESTIMATOR_API_PORT` |
 | `ML_API_URL` | `http://localhost:8000` | Base URL of ml-api |
 | `ML_API_TIMEOUT` | `5.0` | Seconds, for the pooled httpx client |
 | `ML_API_HEALTH_TIMEOUT` | `2.0` | Seconds, for the ml-api probe in `/health` (kept short so `/health` never hangs) |

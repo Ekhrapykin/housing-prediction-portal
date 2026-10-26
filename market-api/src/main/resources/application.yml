@@ -1,4 +1,4 @@
-server.port: 8080
+server.port: ${PORT:8080}
 ml.api:
   url: ${ML_API_URL:http://localhost:8000}
   connect-timeout: 2s

@@ -50,6 +50,7 @@ The backend URLs are build args because rewrites are fixed at `next build`; the 
 
 | Env var | Default (code) | `.env.example` | Read at |
 |---|---|---|---|
+| `PORT` | `3000` | | runtime (Next standalone `server.js`; the image sets `PORT=3000`, compose sets it from `WEB_PORT`) |
 | `ESTIMATOR_API_URL` | `http://estimator-api:8001` | `http://localhost:8001` | build (rewrites) and runtime (`lib/clients/server-transport.ts`) |
 | `MARKET_API_URL` | `http://market-api:8080` | `http://localhost:8080` | build (rewrites) and runtime (`lib/clients/server-transport.ts`) |
 

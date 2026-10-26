@@ -1,6 +1,6 @@
 # Housing Prediction Portal
 
-A house-price prediction platform in one monorepo: a scikit-learn model API (`ml-api`) and a Next.js portal (`web`) with two apps, a Price Estimator and a Market Explorer. Each app has its own backend (`estimator-api` in Python, `market-api` in Java), both store data in PostgreSQL and share one dataset, and CI/CD ships arm64 images to a Raspberry Pi.
+A house-price prediction platform in one monorepo: a scikit-learn model API (`ml-api`) and a Next.js portal (`web`) with two apps, a Price Estimator and a Market Explorer. Each app has its own backend (`estimator-api` in Python, `market-api` in Java), both store data in PostgreSQL and share one dataset, and CI/CD ships amd64 images to any Docker host.
 
 ```mermaid
 flowchart LR
@@ -51,7 +51,7 @@ flowchart LR
 - Contracts: the house-feature schema and market query keys are defined once in `contracts/`, with a contract test in each service.
 - Tests: pytest (both Python services), JUnit (market-api), vitest (web, including the contract check), and Playwright e2e against the compose stack.
 - Docker Compose with PostgreSQL (one database, a schema and role per service) and one healthcheck definition.
-- CI/CD: GitHub Actions tests, builds arm64 images, pushes to GHCR and deploys to a Raspberry Pi.
+- CI/CD: GitHub Actions tests, builds amd64 images, pushes to GHCR and deploys to a Docker host.
 
 ## Quick start
 
@@ -66,7 +66,7 @@ docker compose up --build
 | estimator-api Swagger | http://localhost:8001/docs |
 | market-api Swagger | http://localhost:8080/swagger-ui.html |
 
-The web image needs network at build time (`next/font/google`). Stop with `docker compose down`. Compose starts five services: `postgres` (one database, schemas `estimator` and `market`, one role each, no published port), `ml-api`, `estimator-api`, `market-api` and `web`. Estimates live in the `postgres-data` volume; add `-v` to wipe them. The dataset is the single file `data/house_prices.csv`, bind-mounted read-only into ml-api and market-api, so a data change needs only a restart. Optional: copy `.env.example` to `.env` to change the database passwords (they are read when the volume is first created).
+The web image needs network at build time (`next/font/google`). Stop with `docker compose down`. Compose starts five services: `postgres` (one database, schemas `estimator` and `market`, one role each, no published port), `ml-api`, `estimator-api`, `market-api` and `web`. Estimates live in the `postgres-data` volume; add `-v` to wipe them. The dataset is the single file `data/house_prices.csv`, bind-mounted read-only into ml-api and market-api, so a data change needs only a restart. Optional: copy `.env.example` to `.env` to change the host ports (`ML_API_PORT`, `ESTIMATOR_API_PORT`, `MARKET_API_PORT`, `WEB_PORT`; the URLs above assume the defaults) or the database passwords (read when the volume is first created).
 
 ## Local development
 
@@ -100,9 +100,9 @@ mise tasks
 | `web/` | Next.js portal | [README](web/README.md), [ARCHITECTURE](web/ARCHITECTURE.md) |
 | `contracts/` | Shared schema contracts (house-feature JSON Schema, market query keys); each service has a test that compares its native schema with them | [README](contracts/README.md) |
 | `data/` | The dataset (`house_prices.csv`, single copy), sample inputs (`test_data.csv`) and `postgres/init/` (roles and schemas, run on first start of the Postgres volume) | |
-| `.env.example` | Optional database password overrides | |
+| `.env.example` | Optional overrides: database passwords and host ports | |
 | `docker-compose.yml` | Full stack and the single healthcheck definition, images `ghcr.io/ekhrapykin/hpp-<service>:${TAG:-latest}` | |
-| `.github/workflows/ci-cd.yml` | Test, build arm64 images, deploy to the Pi | |
+| `.github/workflows/ci-cd.yml` | Test, build amd64 images, deploy to a Docker host | |
 | `mise.toml` | Toolchain and tasks | |
 
 ## Testing
@@ -118,15 +118,15 @@ mise run e2e                  # Playwright against a running `docker compose up 
 
 What each suite covers is listed in the service READMEs.
 
-## Deployment (Raspberry Pi)
+## Deployment
 
-Target: Raspberry Pi OS 64-bit (arm64), 4 GB RAM. Images are built natively on GitHub's arm64 runners and pulled from GHCR.
+Target: any Docker host (VPS, home server, cloud VM), amd64 Linux. The compose memory limits are sized to fit a small 2-4 GB host. Images are built on GitHub's `ubuntu-latest` runners and pulled from GHCR. For an ARM host, switch `platforms` in the build job of `ci-cd.yml` and the runner.
 
-1. **Docker** on the Pi: `curl -fsSL https://get.docker.com | sh`, then `sudo usermod -aG docker $USER && newgrp docker`. Check `uname -m` is `aarch64`.
-2. **Self-hosted runner:** repo Settings -> Actions -> Runners -> New self-hosted runner -> Linux -> ARM64. Run the shown commands on the Pi, add the label `pi`, then `sudo ./svc.sh install && sudo ./svc.sh start`.
+1. **Docker** on the host: `curl -fsSL https://get.docker.com | sh`, then `sudo usermod -aG docker $USER && newgrp docker`. Check `uname -m` is `x86_64`.
+2. **Self-hosted runner:** repo Settings -> Actions -> Runners -> New self-hosted runner -> Linux -> x64. Run the shown commands on the host, add the label `deploy`, then `sudo ./svc.sh install && sudo ./svc.sh start`.
 3. **Fork PR guard:** Settings -> Actions -> General -> enable "Require approval for outside collaborators". A self-hosted runner on a public repo must not run strangers' code (deploy only runs on `main` pushes; this is a second guard).
-4. **GHCR visibility:** after the first push, make each `hpp-*` package public so the Pi can pull without a login.
-5. **Expose the portal** (only port 3000): `tailscale funnel 3000`, or a Cloudflare Tunnel to `http://localhost:3000`.
+4. **GHCR visibility:** after the first push, make each `hpp-*` package public so the host can pull without a login.
+5. **Expose the portal** (only `WEB_PORT`, default 3000) through a reverse proxy (Caddy, nginx) or a tunnel (`tailscale funnel 3000`, Cloudflare Tunnel to `http://localhost:3000`). The backend ports are published for Swagger demos; firewall them or drop their `ports:` in compose.
 
 Manual deploy, from a checkout of the repo (compose bind-mounts `./data/house_prices.csv` and `./data/postgres/init`): `docker compose pull && docker compose up -d --no-build`.
 
@@ -135,8 +135,8 @@ Manual deploy, from a checkout of the repo (compose bind-mounts `./data/house_pr
 `.github/workflows/ci-cd.yml`:
 
 1. **Test** (every push and PR): pytest for ml-api (it trains in `lifespan` from the repo's CSV) and estimator-api (SQLite), `./gradlew test` for market-api (H2), lint + `tsc` + vitest + `next build` for web (Playwright e2e is local only).
-2. **Build** (not on PRs): each service built for `linux/arm64` on `ubuntu-24.04-arm`, pushed to GHCR as `latest` and the commit SHA.
-3. **Deploy** (`main` only, `pi` runner): with `TAG` set to the commit SHA, `docker compose pull`, `up -d --no-build --remove-orphans`, wait until every container is healthy (the healthchecks are defined once in `docker-compose.yml`), prune old images. Roll back by running compose with `TAG=<older sha>`.
+2. **Build** (not on PRs): each service built for `linux/amd64` on `ubuntu-latest`, pushed to GHCR as `latest` and the commit SHA.
+3. **Deploy** (`main` only, runner labelled `deploy`): with `TAG` set to the commit SHA, `docker compose pull`, `up -d --no-build --remove-orphans`, wait until every container is healthy (the healthchecks are defined once in `docker-compose.yml`), prune old images. Roll back by running compose with `TAG=<older sha>`.
 
 ## Further reading
 

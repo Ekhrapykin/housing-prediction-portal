@@ -43,6 +43,7 @@ Read by `app/config.py` (pydantic-settings, env var = upper-cased field name).
 
 | Env var | Default | Purpose |
 |---|---|---|
+| `PORT` | `8000` (set in the image) | Listen port of the Docker image (`CMD` runs `uvicorn --port ${PORT}`); not read by `app/config.py`. Compose sets it from `ML_API_PORT` |
 | `DATA_PATH` | `../data/house_prices.csv` (repo root; `/data/house_prices.csv` in Docker) | Training CSV, read at startup (UTF-8 with BOM is handled) |
 | `MODEL_ALPHA` | `10.0` | Ridge strength. Fixed, not cross-validated, so coefficients stay interpretable on collinear features (see [limitations](../ARCHITECTURE.md#limitations-and-future-work)) |
 

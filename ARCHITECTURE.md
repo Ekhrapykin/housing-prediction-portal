@@ -7,7 +7,7 @@ System view of the Housing Prediction Portal. Each service has its own deep dive
 ```mermaid
 flowchart TB
   U[User browser] -->|HTTPS via tunnel| W
-  subgraph Host["Docker host (laptop or Raspberry Pi)"]
+  subgraph Host["Docker host (laptop or any server)"]
     W[web<br/>Next.js 16 :3000]
     E[estimator-api<br/>FastAPI :8001]
     M[market-api<br/>Spring Boot :8080]
@@ -23,7 +23,7 @@ flowchart TB
     CSV -.->|trains at startup| ML
     CSV -.->|synced on every start| M
   end
-  GH[GitHub Actions] -->|arm64 images| GHCR[(GHCR)]
+  GH[GitHub Actions] -->|amd64 images| GHCR[(GHCR)]
   GHCR -->|docker compose pull| Host
 ```
 
@@ -190,16 +190,16 @@ The market data never changes while the app runs, so time-based expiry is enough
 ```mermaid
 flowchart LR
   P[push to main] --> T[test jobs<br/>pytest, gradle, lint/tsc/build]
-  T --> BLD[build matrix<br/>ubuntu-24.04-arm, linux/arm64]
+  T --> BLD[build matrix<br/>ubuntu-latest, linux/amd64]
   BLD -->|:latest and :SHA| G[(ghcr.io/ekhrapykin/hpp-*)]
-  BLD --> D[deploy job<br/>self-hosted runner label pi]
-  D -->|TAG = SHA, compose pull and up| PI[Raspberry Pi<br/>docker compose]
+  BLD --> D[deploy job<br/>self-hosted runner label deploy]
+  D -->|TAG = SHA, compose pull and up| HOST[Docker host<br/>docker compose]
 ```
 
-- **Compose:** one file for laptop (`up --build`) and Pi (`pull` + `up -d --no-build`). Images are named `ghcr.io/ekhrapykin/hpp-<service>:${TAG:-latest}`. Memory limits: postgres 384m (`shared_buffers=64MB`, `max_connections=30`), ml-api 512m, estimator-api 256m, market-api 640m (JVM `-Xmx256m`, SerialGC), web 384m. the dataset file `./data/house_prices.csv` (into ml-api and market-api) and `./data/postgres/init` (into Postgres) are bind-mounted from the checkout, which the deploy job has; Postgres data is the named volume `postgres-data`. Healthchecks live only in compose: a shared `x-healthcheck` anchor (interval 10s, timeout 3s, retries 5, start_period 15s) merged into every service, with a longer `start_period` for ml-api (30s, trains at startup) and market-api (40s, JVM) and a 5s timeout for web; the Dockerfiles have no `HEALTHCHECK`. Postgres has no published port. Passwords come from `.env` or demo defaults in compose (`.env.example`).
+- **Compose:** one file for a laptop (`up --build`) and a deploy host (`pull` + `up -d --no-build`). Images are named `ghcr.io/ekhrapykin/hpp-<service>:${TAG:-latest}`. Memory limits, sized to fit a small 2-4 GB host: postgres 384m (`shared_buffers=64MB`, `max_connections=30`), ml-api 512m, estimator-api 256m, market-api 640m (JVM `-Xmx256m`, SerialGC), web 384m. the dataset file `./data/house_prices.csv` (into ml-api and market-api) and `./data/postgres/init` (into Postgres) are bind-mounted from the checkout, which the deploy job has; Postgres data is the named volume `postgres-data`. Healthchecks live only in compose: a shared `x-healthcheck` anchor (interval 10s, timeout 3s, retries 5, start_period 15s) merged into every service, with a longer `start_period` for ml-api (30s, trains at startup) and market-api (40s, JVM) and a 5s timeout for web; the Dockerfiles have no `HEALTHCHECK`. Postgres has no published port. Host ports (`ML_API_PORT`, `ESTIMATOR_API_PORT`, `MARKET_API_PORT`, `WEB_PORT`) and passwords come from `.env` or demo defaults in compose (`.env.example`).
 - **Images:** ml-api and market-api images contain no data (the CSV is mounted) and ml-api no model (it trains at startup); market-api is a multi-stage JDK-to-JRE build; web is a multi-stage Next `standalone` build with backend URLs as build args. All four app images run as a non-root user; Postgres is the official `postgres:17-alpine` image.
-- **CI:** tests run on every push and PR. Images are built natively for arm64 on `ubuntu-24.04-arm` (no QEMU), with a GitHub Actions layer cache per service.
-- **CD:** the deploy job runs on the Pi's self-hosted runner with `TAG=${{ github.sha }}`, so it deploys exactly the images built in that run rather than whatever `latest` is. It waits up to 150 s for all containers to be healthy and fails the job otherwise. Rollback is `TAG=<older sha> docker compose up -d`.
+- **CI:** tests run on every push and PR. Images are built for `linux/amd64` on `ubuntu-latest`, with a GitHub Actions layer cache per service.
+- **CD:** the deploy job runs on the self-hosted runner labelled `deploy` with `TAG=${{ github.sha }}`, so it deploys exactly the images built in that run rather than whatever `latest` is. It waits up to 150 s for all containers to be healthy and fails the job otherwise. Rollback is `TAG=<older sha> docker compose up -d`.
 - **Exposure:** only port 3000 needs to be public (Tailscale Funnel or Cloudflare Tunnel). Backend ports are published for Swagger demos only.
 
 ## Tech choices
@@ -210,14 +210,14 @@ flowchart LR
 | Estimator backend | FastAPI, SQLAlchemy 2.x (typed ORM), psycopg 3, httpx | Same stack as ml-api; the ORM runs on SQLite (tests, local) and Postgres (Docker) unchanged |
 | Market backend | Java 21, Spring Boot 3.4.4, Gradle 8.14 (Kotlin DSL, version catalog) | Boot 3.4.4 supports Java up to 24 and Java 21 is the LTS; Boot gives JPA, cache, validation, ProblemDetail, actuator |
 | Market storage | Hibernate on Postgres in Docker, H2 locally and in tests, JPA Specifications | Read-only 50-row dataset; composable filters; one JPA codebase on both |
-| Database | PostgreSQL 17 (alpine), one instance, one DB, schema and role per service | A real database on the Pi without a container per service; `postgres:17` is a mature supported major with a stable volume path |
+| Database | PostgreSQL 17 (alpine), one instance, one DB, schema and role per service | A real database without a container per service; `postgres:17` is a mature supported major with a stable volume path |
 | Market cache | Caffeine | In-process, no extra container |
 | Exports | OpenPDF 2.4.0, hand-written CSV | Small, permissive PDF library |
 | Portal | Next.js 16.4.3 App Router, React 19.3 | RSC for server-rendered market views, one origin for both apps |
 | Client data | TanStack Query 5, TanStack Table 9 | Cache, invalidation, hydration from RSC |
 | Forms/UI | react-hook-form, zod 4, Tailwind 4, shadcn, Recharts 3 | Typed validation, accessible primitives |
 | Toolchain | mise, uv, Gradle wrapper, npm | One `mise install` pins everything |
-| Runtime | Docker Compose on a Raspberry Pi (arm64), GHCR, GitHub Actions | Cheap, real deployment target |
+| Runtime | Docker Compose on any Docker host (amd64), GHCR, GitHub Actions | Cheap, real deployment target; amd64 only |
 
 ## Decisions and trade-offs
 
@@ -225,7 +225,7 @@ flowchart LR
 
 **One PostgreSQL with a schema and a role per service.** Both backends store data through an ORM, so one `postgres:17-alpine` container (about 64 MB shared buffers) serves them without a database per service. Database `housing` has schemas `estimator` and `market`. Each is owned by its own role, nobody else has grants on it, and `search_path` is set per role, so unqualified table names land in the right schema and one service cannot read the other's tables. The init script (`data/postgres/init/01-schemas.sh`) creates them on first start, tables come from the ORMs (`create_all`, Hibernate `ddl-auto: create`), and there is no Flyway or Alembic. Hibernate's `create` is safe because market data is re-synced from the CSV on every start (`CsvPropertySync`; a deliberate sync of a read model, not a one-off seed, switchable with `market.sync-on-startup` once Flyway owns the data); estimates are never dropped because SQLAlchemy only creates missing tables. Local runs and tests stay on SQLite (estimator) and in-memory H2 (market), so no database is needed to develop; the same ORM code runs on both. Cost: one more container and a single shared failure point (one instance, no replication), and the portability is only as good as the tests, which do not run against Postgres (see [Limitations and future work](#limitations-and-future-work)).
 
-**Training at startup from a mounted CSV.** `data/house_prices.csv` exists once in the repo and is bind-mounted read-only into ml-api (training) and market-api (synced on start), instead of being copied into two images. ml-api trains in `lifespan` (about a second, deterministic because the CV split has a fixed seed), so changing the data needs a restart, not a rebuild, and CI tests the same code path the service runs. A bind mount, not a named volume, so the file comes from the checkout that the Pi deploy job already has. Cost: the image alone is not a model, startup is slightly slower (compose `start_period` is 30 s), and there is still no model registry (see [Limitations and future work](#limitations-and-future-work)).
+**Training at startup from a mounted CSV.** `data/house_prices.csv` exists once in the repo and is bind-mounted read-only into ml-api (training) and market-api (synced on start), instead of being copied into two images. ml-api trains in `lifespan` (about a second, deterministic because the CV split has a fixed seed), so changing the data needs a restart, not a rebuild, and CI tests the same code path the service runs. A bind mount, not a named volume, so the file comes from the checkout that the deploy job already has. Cost: the image alone is not a model, startup is slightly slower (compose `start_period` is 30 s), and there is still no model registry (see [Limitations and future work](#limitations-and-future-work)).
 
 **Ridge over OLS or boosting.** With 50 rows and features correlated at 0.91-0.99, OLS coefficients are unstable, and boosting would overfit and lose the linear explanation the portal shows (contribution = coefficient x distance from mean). Ridge regularises and stays explainable. Alpha is fixed at 10 (`MODEL_ALPHA`) rather than cross-validated: the CV-picked alpha was tiny and left some coefficients with implausible signs. Cost: about 0.01 of CV R2 (0.973). Model quality is not the focus: the project is about the service architecture around the model; α=10 is fixed so coefficients stay interpretable (see [Limitations and future work](#limitations-and-future-work)).
 
@@ -246,7 +246,7 @@ One list for the whole system; the service ARCHITECTURE files keep only their im
 | Model | No model versioning (`trained_at` is the only identifier), and retraining needs a restart. | Training takes about a second and is deterministic; a restart is enough while the data is static. | On-the-fly retraining: `POST /admin/retrain` in ml-api reads the new CSV, validates it (columns, ranges, row count), trains, and swaps the in-memory model only if the CV metrics pass a threshold (for example R2 not below the current model's minus a tolerance). A `model_runs` table logs each attempt with metrics, data hash and outcome, which also gives versioning. |
 | **Data and storage** | No migrations: `create_all` and `ddl-auto: create` only handle the first creation. | No column has had to change on live data. | Alembic for estimator-api and Flyway for market-api once a column must change on live data (then set `market.sync-on-startup` to false so Flyway owns the data). |
 | Data and storage | The `postgres-data` volume is the only copy of the estimates. | Demo data. | A scheduled `pg_dump` of the `estimator` schema to the host or object storage, to survive a bad SD card. |
-| Data and storage | One Postgres instance, no replication: a single shared failure point. | A real database on the Pi without a container per service. | Replication or a managed database if availability matters. |
+| Data and storage | One Postgres instance, no replication: a single shared failure point. | A real database without a container per service. | Replication or a managed database if availability matters. |
 | Data and storage | The dataset is loaded twice: ml-api trains from the CSV and market-api syncs it into its own table. | One read-only 50-row file, one copy in the repo. | A shared read-only `housing` schema would remove the second copy if the data grows. |
 | **Backends** | The feature schema is duplicated four times (drift is caught by the contract tests). | Three languages and four deployables: codegen or a shared package is more machinery than a 7-field schema that has not changed. | Generate clients from ml-api's OpenAPI when a fifth consumer appears. |
 | Backends | The error contract is not uniform: 400 vs 422 for validation, and FastAPI's 422 `detail` is a list. | Each framework's native behaviour; the portal normalises both shapes. | Unify only if a client other than the portal needs one shape. |
@@ -267,6 +267,7 @@ One list for the whole system; the service ARCHITECTURE files keep only their im
 | Testing | No component tests in the web, only unit tests (vitest). | The unit and e2e layers cover the main flows. | Testing Library + jsdom for the estimate form (required-field errors send no request) and the market filters Reset. |
 | Testing | Repository and JPA tests run on SQLite and H2, not Postgres. | No database is needed to develop; the same ORM code runs on both. | Testcontainers for Postgres, so portability is checked, including the per-role schemas. |
 | **Operations and deploy** | Single host, no TLS termination of its own; it relies on the tunnel. | Tailscale Funnel or Cloudflare Tunnel provides TLS for the one public port. | A reverse proxy with TLS if the host is exposed directly. |
-| Operations and deploy | No metrics stack (Prometheus and Grafana). | Too heavy for the Pi's memory budget (the compose limits are already tight), and `/metrics` with no consumer shows nothing; request-id logs cover debugging. | Add when there is a consumer and memory to spare. |
+| Operations and deploy | No metrics stack (Prometheus and Grafana). | Too heavy for a small host's memory budget (the compose limits, sized to fit 2-4 GB, are already tight), and `/metrics` with no consumer shows nothing; request-id logs cover debugging. | Add when there is a consumer and memory to spare. |
+| Operations and deploy | Images are built for amd64 only. | Covers any common VPS or server; a second arch doubles build time. | Add `linux/arm64` (and an ARM runner) if an ARM host is needed. |
 | Operations and deploy | Plain-text logs, no central collection. | `docker compose logs \| grep <request id>` is enough for one host and three services. | Structured JSON logs with central collection when there is more than one host. |
-| Operations and deploy | Backend ports 8000, 8001 and 8080 are published for Swagger demos. | Convenient for demos; the rate limiter still keys by the TCP peer on `:8001`. | Drop the `ports:` of the backends in a locked-down setup. |
+| Operations and deploy | Backend ports (default 8000, 8001 and 8080, set in `.env`) are published for Swagger demos. | Convenient for demos; the rate limiter still keys by the TCP peer on `:8001`. | Drop the `ports:` of the backends in a locked-down setup. |

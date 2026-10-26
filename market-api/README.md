@@ -49,7 +49,7 @@ Multi-stage build: JDK image runs `./gradlew bootJar`, the runtime is `eclipse-t
 | `data.path` | `DATA_PATH` | `../data/house_prices.csv` | Dataset CSV (`/data/house_prices.csv` in Docker); UTF-8 BOM handled |
 | `market.sync-on-startup` | `MARKET_SYNC_ON_STARTUP` | `true` | Reload the market table from the CSV on start; turn off once migrations own the data |
 | `spring.datasource.*` | `DATABASE_URL`, `MARKET_DB_PASSWORD` | H2 in-memory | `docker` profile only (`application-docker.yml`) |
-| `server.port` | | `8080` | |
+| `server.port` | `PORT` | `8080` | Listen port; the image sets `PORT=8080`, compose sets it from `MARKET_API_PORT` |
 | `ml.api.connect-timeout` | | `2s` | ml-api connect timeout (`MlProperties`) |
 | `ml.api.read-timeout` | | `5s` | ml-api read timeout (`MlProperties`) |
 | `logging.pattern.level` | | `%5p [req=%X{requestId:--}]` | Adds the request id (from `RequestIdFilter`) to every log line |

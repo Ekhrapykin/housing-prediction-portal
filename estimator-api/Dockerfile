@@ -10,5 +10,8 @@ COPY app ./app
 RUN useradd --system --uid 10001 app
 USER app
 
+# Listen port; override with PORT. EXPOSE is documentation only, so it keeps the default.
+ENV PORT=8001
 EXPOSE 8001
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+# sh -c + exec: expands $PORT, and uvicorn still ends up as PID 1.
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]

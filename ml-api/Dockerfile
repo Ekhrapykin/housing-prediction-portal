@@ -13,5 +13,8 @@ ENV DATA_PATH=/data/house_prices.csv
 RUN useradd --system --uid 10001 app
 USER app
 
+# Listen port; override with PORT. EXPOSE is documentation only, so it keeps the default.
+ENV PORT=8000
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# sh -c + exec: expands $PORT, and uvicorn still ends up as PID 1.
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
