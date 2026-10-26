@@ -15,8 +15,7 @@ export function Nav() {
           <span className="grid size-8 place-items-center rounded-md bg-white/10" aria-hidden>
             <House className="size-4.5" />
           </span>
-          <span className="hidden sm:inline">Housing Prediction Portal</span>
-          <span className="sm:hidden">Housing Portal</span>
+          <span className="sr-only sm:not-sr-only">Housing Prediction Portal</span>
         </Link>
         <ul className="flex gap-1">
           {Object.values(APPS).map((a) => {
