@@ -91,7 +91,8 @@ jobs:
 
   deploy:
     needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    # Manual only: Actions > ci-cd > Run workflow on main. A push runs tests and builds images, no deploy.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, deploy]
     env:
       TAG: ${{ github.sha }} # deploy exactly the images built in this run; roll back with TAG=<older sha>

@@ -124,7 +124,7 @@ Target: any Docker host (VPS, home server, cloud VM), amd64 Linux. The compose m
 
 1. **Docker** on the host: `curl -fsSL https://get.docker.com | sh`, then `sudo usermod -aG docker $USER && newgrp docker`. Check `uname -m` is `x86_64`.
 2. **Self-hosted runner:** repo Settings -> Actions -> Runners -> New self-hosted runner -> Linux -> x64. Run the shown commands on the host, add the label `deploy`, then `sudo ./svc.sh install && sudo ./svc.sh start`.
-3. **Fork PR guard:** Settings -> Actions -> General -> enable "Require approval for outside collaborators". A self-hosted runner on a public repo must not run strangers' code (deploy only runs on `main` pushes; this is a second guard).
+3. **Fork PR guard:** Settings -> Actions -> General -> enable "Require approval for outside collaborators". A self-hosted runner on a public repo must not run strangers' code (deploy only runs on a manual run on `main`; this is a second guard).
 4. **GHCR visibility:** after the first push, make each `hpp-*` package public so the host can pull without a login.
 5. **Expose the portal** (only `WEB_PORT`, default 3000) through a reverse proxy (Caddy, nginx) or a tunnel (Cloudflare Tunnel to `http://localhost:3000`). The portal must sit behind a reverse proxy or tunnel that appends the client IP to `X-Forwarded-For` (nginx, Caddy, Traefik, Cloudflare and similar); exposing `web` directly lets a client pick its own rate-limit key. The backend ports are published for Swagger demos; firewall them or drop their `ports:` in compose.
 
@@ -136,7 +136,7 @@ Manual deploy, from a checkout of the repo (compose bind-mounts `./data/house_pr
 
 1. **Test** (every push and PR): pytest for ml-api (it trains in `lifespan` from the repo's CSV) and estimator-api (SQLite), `./gradlew test` for market-api (H2), lint + `tsc` + vitest + `next build` for web (Playwright e2e is local only).
 2. **Build** (not on PRs): each service built for `linux/amd64` on `ubuntu-latest`, pushed to GHCR as `latest` and the commit SHA.
-3. **Deploy** (`main` only, runner labelled `deploy`): with `TAG` set to the commit SHA, `docker compose pull`, `up -d --no-build --remove-orphans`, wait until every container is healthy (the healthchecks are defined once in `docker-compose.yml`), prune old images. Roll back by running compose with `TAG=<older sha>`.
+3. **Deploy** (manual only: Actions → ci-cd → Run workflow on `main`; a push never deploys; runner labelled `deploy`): with `TAG` set to the commit SHA, `docker compose pull`, `up -d --no-build --remove-orphans`, wait until every container is healthy (the healthchecks are defined once in `docker-compose.yml`), prune old images. Roll back by running compose with `TAG=<older sha>`.
 
 ## Further reading
 

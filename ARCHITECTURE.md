@@ -194,14 +194,14 @@ flowchart LR
   P[push to main] --> T[test jobs<br/>pytest, gradle, lint/tsc/build]
   T --> BLD[build matrix<br/>ubuntu-latest, linux/amd64]
   BLD -->|:latest and :SHA| G[(ghcr.io/ekhrapykin/hpp-*)]
-  BLD --> D[deploy job<br/>self-hosted runner label deploy]
+  BLD -.manual Run workflow only.-> D[deploy job<br/>self-hosted runner label deploy]
   D -->|TAG = SHA, compose pull and up| HOST[Docker host<br/>docker compose]
 ```
 
 - **Compose:** one file for a laptop (`up --build`) and a deploy host (`pull` + `up -d --no-build`). Images are named `ghcr.io/ekhrapykin/hpp-<service>:${TAG:-latest}`. Memory limits, sized to fit a small 2-4 GB host: postgres 384m (`shared_buffers=64MB`, `max_connections=30`), ml-api 512m, estimator-api 256m, market-api 640m (JVM `-Xmx256m`, SerialGC), web 384m. the dataset file `./data/house_prices.csv` (into ml-api and market-api) and `./data/postgres/init` (into Postgres) are bind-mounted from the checkout, which the deploy job has; Postgres data is the named volume `postgres-data`. Healthchecks live only in compose: a shared `x-healthcheck` anchor (interval 10s, timeout 3s, retries 5, start_period 15s) merged into every service, with a longer `start_period` for ml-api (30s, trains at startup) and market-api (40s, JVM) and a 5s timeout for web; the Dockerfiles have no `HEALTHCHECK`. Postgres has no published port. Host ports (`ML_API_PORT`, `ESTIMATOR_API_PORT`, `MARKET_API_PORT`, `WEB_PORT`) and passwords come from `.env` or demo defaults in compose (`.env.example`).
 - **Images:** ml-api and market-api images contain no data (the CSV is mounted) and ml-api no model (it trains at startup); market-api is a multi-stage JDK-to-JRE build; web is a multi-stage Next `standalone` build with backend URLs as build args. All four app images run as a non-root user; Postgres is the official `postgres:17-alpine` image.
 - **CI:** tests run on every push and PR. Images are built for `linux/amd64` on `ubuntu-latest`, with a GitHub Actions layer cache per service.
-- **CD:** the deploy job runs on the self-hosted runner labelled `deploy` with `TAG=${{ github.sha }}`, so it deploys exactly the images built in that run rather than whatever `latest` is. It waits up to 150 s for all containers to be healthy and fails the job otherwise. Rollback is `TAG=<older sha> docker compose up -d`.
+- **CD:** deploy is manual: it runs only when the workflow is started by hand (Run workflow, `workflow_dispatch`) on `main`; a push tests and builds images but does not deploy. The deploy job runs on the self-hosted runner labelled `deploy` with `TAG=${{ github.sha }}`, so it deploys exactly the images built in that run rather than whatever `latest` is. It waits up to 150 s for all containers to be healthy and fails the job otherwise. Rollback is `TAG=<older sha> docker compose up -d`.
 - **Exposure:** only port 3000 needs to be public (a reverse proxy or a tunnel). Backend ports are published for Swagger demos only.
 
 ## Tech choices
