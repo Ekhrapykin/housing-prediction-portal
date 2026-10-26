@@ -54,8 +54,16 @@ class WhatIfServiceTest {
 
     @Test
     void integerFeaturesAreRounded() {
-        assertThat(points(new WhatIfRequest(BASE, "year_built", 1900.0, 2000.0, 4)))
-                .extracting(WhatIfPoint::value).containsExactly(1900.0, 1933.0, 1967.0, 2000.0);
+        // range excludes the base (1997), so only the rounded grid comes back
+        assertThat(points(new WhatIfRequest(BASE, "year_built", 1800.0, 1900.0, 4)))
+                .extracting(WhatIfPoint::value).containsExactly(1800.0, 1833.0, 1867.0, 1900.0);
+    }
+
+    @Test
+    void baseValueInsideTheRangeIsAddedInOrder() {
+        // grid 6.3, 7.3, 8.3, 9.3 misses the base school rating 7.6
+        assertThat(points(new WhatIfRequest(BASE, "school_rating", 6.3, 9.3, 4)))
+                .extracting(WhatIfPoint::value).containsExactly(6.3, 7.3, 7.6, 8.3, 9.3);
     }
 
     @Test

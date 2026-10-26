@@ -52,8 +52,9 @@ function ranges(feature: FeatureName, s: FeatureStat) {
 function typicalHouse(info: ModelInfo): HouseFeatures {
   const out = {} as HouseFeatures;
   for (const f of FIELDS) {
-    const mean = info.feature_stats[f.name].mean;
-    out[f.name] = isInteger(f.name) ? Math.round(mean) : Math.round(mean * 10) / 10;
+    // Round the mean to the field's input step, so bathrooms is 2 (step 0.5), not 1.85 → 1.9.
+    const perUnit = 1 / Number(f.step);
+    out[f.name] = Math.round(info.feature_stats[f.name].mean * perUnit) / perUnit;
   }
   return out;
 }
