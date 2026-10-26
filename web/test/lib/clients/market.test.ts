@@ -9,7 +9,7 @@ const NONE = loadSearchParams({}).filters;
 
 describe("filtersQuery", () => {
   it("skips nulls", () => {
-    expect(filtersQuery({ ...NONE, min_bedrooms: 3, min_price: 0 }).toString()).toBe("min_bedrooms=3&min_price=0");
+    expect(filtersQuery({ ...NONE, bedrooms: [2, 4], min_price: 0 }).toString()).toBe("bedrooms=2%2C4&min_price=0");
   });
 
   it("is empty when nothing is set, so callers leave no trailing ?", () => {
@@ -40,8 +40,8 @@ describe("properties loader", () => {
   });
 
   it("passes filters through and sets the page size", async () => {
-    const sp = await run({ min_bedrooms: "3" });
-    expect(sp.get("min_bedrooms")).toBe("3");
+    const sp = await run({ bedrooms: "2,4" });
+    expect(sp.get("bedrooms")).toBe("2,4");
     expect(sp.get("size")).toBe(String(PROPERTIES_PAGE_SIZE));
   });
 });
@@ -54,8 +54,8 @@ describe("paging translation", () => {
   });
 
   it("keeps the filters already in the query", () => {
-    const sp = pagingQuery(filtersQuery({ ...NONE, min_bedrooms: 2 }), { page: 1, sort: null, dir: "asc" }, 15);
-    expect(sp.get("min_bedrooms")).toBe("2");
+    const sp = pagingQuery(filtersQuery({ ...NONE, bedrooms: [2] }), { page: 1, sort: null, dir: "asc" }, 15);
+    expect(sp.get("bedrooms")).toBe("2");
   });
 });
 

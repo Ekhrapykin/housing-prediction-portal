@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hpp.market.ingest.CsvPropertySync;
 import com.hpp.market.dto.MarketFilter;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -20,9 +21,9 @@ class PropertyRepositoryTest {
     }
 
     @Test
-    void specificationNarrowsResults() {
-        var f = new MarketFilter(4, null, null, null, null, null, null, null);
+    void bedroomsIsAnyOf() {
+        var f = new MarketFilter(List.of(2, 4), null, null, null, null, null, null);
         var rows = repo.findAll(PropertySpecifications.from(f));
-        assertThat(rows).isNotEmpty().hasSizeLessThan(50).allMatch(p -> p.getBedrooms() >= 4);
+        assertThat(rows).isNotEmpty().hasSizeLessThan(50).allMatch(p -> p.getBedrooms() == 2 || p.getBedrooms() == 4);
     }
 }

@@ -66,7 +66,7 @@ The defaults live in `lib/backends.ts`, imported by both `next.config.ts` and `l
 | `/estimator` | RSC prefetch of model info, client form | `GET /model-info`, `POST /estimates` |
 | `/estimator/history` | RSC prefetch, client table (select 2-4, delete) | `GET /estimates`, `DELETE /estimates/{id}` |
 | `/estimator/compare?ids=1,2` | RSC prefetch (2-4 ids), client view | `GET /estimates?ids=` |
-| `/market?min_bedrooms=…&by=…` | server-rendered dashboard streamed in `Suspense` | `GET /summary`, `/segments`, `/properties?size=100` |
+| `/market?bedrooms=…&by=…` | server-rendered dashboard streamed in `Suspense` | `GET /summary`, `/segments`, `/properties?size=100` |
 | `/market/properties?page=&sort=` | server-rendered, 15 per page | `GET /properties` |
 | `/market/what-if` | RSC prefetch of model info, client tool | `POST /what-if` (debounced, `WHAT_IF_DEBOUNCE_MS`) |
 

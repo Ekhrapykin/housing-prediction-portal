@@ -9,15 +9,22 @@ async function slide(page: Page, name: string, steps: number) {
   return thumb;
 }
 
+/** Tick bedroom counts in the dropdown checklist, then close it. */
+async function pickBedrooms(page: Page, ...counts: number[]) {
+  await page.locator("#f-bedrooms").click();
+  for (const n of counts) await page.getByRole("option", { name: `${n} bedrooms` }).click();
+  await page.keyboard.press("Escape");
+}
+
 test.describe("market filters", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/market");
   });
 
   test("rapid select changes persist and the KPI follows", async ({ page }) => {
-    await page.locator("#f-min_bedrooms").selectOption("4");
+    await pickBedrooms(page, 4);
     await page.locator("#f-by").selectOption("DECADE");
-    await expect(page).toHaveURL(/min_bedrooms=4/);
+    await expect(page).toHaveURL(/bedrooms=4/);
     await expect(page).toHaveURL(/by=DECADE/);
     await expect(page.locator("main")).toHaveText(/PROPERTIES\s*15\b/i, { useInnerText: true });
   });
@@ -35,21 +42,28 @@ test.describe("market filters", () => {
   });
 
   test("export links carry the current filters", async ({ page }) => {
-    await page.locator("#f-min_bedrooms").selectOption("4");
+    await pickBedrooms(page, 4);
     await slide(page, "Min school rating", 85);
     const csv = page.locator('a[href*="export.csv"]');
-    await expect(csv).toHaveAttribute("href", /min_bedrooms=4/);
+    await expect(csv).toHaveAttribute("href", /bedrooms=4/);
     await expect(csv).toHaveAttribute("href", /min_school_rating=8\.5/);
   });
 
   test("reset clears the URL and the inputs", async ({ page }) => {
-    await page.locator("#f-min_bedrooms").selectOption("4");
+    await pickBedrooms(page, 4);
     await slide(page, "Min school rating", 85);
     await expect(page).toHaveURL(/min_school_rating=8\.5/);
     await page.getByRole("button", { name: "Reset", exact: true }).click();
     await expect(page).toHaveURL((u) => u.search === "");
     await expect(page.getByRole("slider", { name: "Min school rating" })).toHaveValue("0");
-    await expect(page.locator("#f-min_bedrooms")).toHaveValue("");
+    await expect(page.locator("#f-bedrooms")).toHaveText("Any");
+  });
+
+  test("several bedroom counts combine as any-of", async ({ page }) => {
+    await pickBedrooms(page, 4, 2);
+    await expect(page).toHaveURL(/bedrooms=2(,|%2C)4/);
+    await expect(page.locator("#f-bedrooms")).toHaveText("2, 4");
+    await expect(page.locator("main")).toHaveText(/PROPERTIES\s*28\b/i, { useInnerText: true }); // 13 two-bed + 15 four-bed
   });
 
   test("the default segment is not written to the URL", async ({ page }) => {

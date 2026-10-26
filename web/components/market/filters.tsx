@@ -1,6 +1,7 @@
 "use client";
 
-import { CalendarDays, GraduationCap, type LucideIcon, MapPin, RotateCcw, Tag } from "lucide-react";
+import { Select } from "@base-ui/react/select";
+import { BedDouble, CalendarDays, Check, ChevronDown, GraduationCap, Layers, type LucideIcon, MapPin, RotateCcw, Tag } from "lucide-react";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -72,19 +73,50 @@ function SliderFilter({
   );
 }
 
-function BedroomsFilter({ name, label, filters }: { name: "min_bedrooms" | "max_bedrooms"; label: string; filters: Filters }) {
+const BEDROOM_OPTIONS = [1, 2, 3, 4, 5, 6];
+
+/** Multi-select dropdown checklist; any of the ticked counts matches. */
+function BedroomsFilter({ filters }: { filters: Filters }) {
+  const value = filters.params.bedrooms ?? [];
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={`f-${name}`}>{label}</Label>
-      <NativeSelect id={`f-${name}`} className="w-full" value={filters.params[name] ?? ""} onChange={(e) => filters.set({ [name]: e.target.value ? Number(e.target.value) : null })}>
-        <option value="">Any</option>
-        {[1, 2, 3, 4, 5, 6].map((n) => (
-          <option key={n} value={n}>
-            {n}
-            {name === "min_bedrooms" ? "+" : ""}
-          </option>
-        ))}
-      </NativeSelect>
+      <Label htmlFor="f-bedrooms">
+        <BedDouble className="size-4 text-primary" aria-hidden />
+        Bedrooms
+      </Label>
+      <Select.Root
+        multiple
+        value={value}
+        onValueChange={(v) => filters.set({ bedrooms: v.length ? [...v].sort((a, b) => a - b) : null })}
+      >
+        <Select.Trigger
+          id="f-bedrooms"
+          className="flex h-8 w-full items-center justify-between gap-2 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <Select.Value>{(v: number[]) => (v.length ? v.join(", ") : "Any")}</Select.Value>
+          <ChevronDown className="size-4 text-muted-foreground" aria-hidden />
+        </Select.Trigger>
+        <Select.Portal>
+          <Select.Positioner alignItemWithTrigger={false} sideOffset={4} className="z-50">
+            <Select.Popup className="min-w-(--anchor-width) rounded-lg border bg-popover p-1 text-sm shadow-md outline-none">
+              {BEDROOM_OPTIONS.map((n) => (
+                <Select.Item
+                  key={n}
+                  value={n}
+                  className="group flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 outline-none select-none data-highlighted:bg-accent"
+                >
+                  <span className="grid size-4 place-items-center rounded-[4px] border border-input group-data-[selected]:border-primary group-data-[selected]:bg-primary group-data-[selected]:text-primary-foreground">
+                    <Select.ItemIndicator>
+                      <Check className="size-3" aria-hidden />
+                    </Select.ItemIndicator>
+                  </span>
+                  <Select.ItemText>{n} {n === 1 ? "bedroom" : "bedrooms"}</Select.ItemText>
+                </Select.Item>
+              ))}
+            </Select.Popup>
+          </Select.Positioner>
+        </Select.Portal>
+      </Select.Root>
     </div>
   );
 }
@@ -103,10 +135,12 @@ export function Filters({ children }: { children: React.ReactNode }) {
         <SliderFilter label="Year built" icon={CalendarDays} min={1950} max={2025} step={1} keys={["min_year_built", "max_year_built"]} format={String} filters={filters} />
         <SliderFilter label="School rating" icon={GraduationCap} min={0} max={10} step={0.1} keys={["min_school_rating", null]} format={number} filters={filters} />
         <SliderFilter label="Distance to center" icon={MapPin} min={0} max={20} step={0.5} keys={[null, "max_distance"]} format={(n) => `${number(n)} km`} filters={filters} />
-        <BedroomsFilter name="min_bedrooms" label="Min bedrooms" filters={filters} />
-        <BedroomsFilter name="max_bedrooms" label="Max bedrooms" filters={filters} />
+        <BedroomsFilter filters={filters} />
         <div className="space-y-1.5">
-          <Label htmlFor="f-by">Group by</Label>
+          <Label htmlFor="f-by">
+            <Layers className="size-4 text-primary" aria-hidden />
+            Group by
+          </Label>
           <NativeSelect id="f-by" className="w-full" value={filters.params.by} onChange={(e) => filters.set({ by: e.target.value as SegmentKey })}>
             {SEGMENT_KEYS.map((k) => (
               <option key={k} value={k}>

@@ -41,11 +41,14 @@ describe("market", () => {
     expect(sorted(Object.keys(filterParsers)), "filter parser names vs contract").toEqual(sorted(Object.keys(market.filters)));
   });
 
-  // nuqs parsers carry no type tag, so probe: parseAsFloat keeps "1.5", parseAsInteger truncates it.
+  // nuqs parsers carry no type tag, so probe: parseAsFloat keeps "1.5", parseAsInteger truncates it, an array parser splits on ",".
   // Web may narrow number to integer (whole-dollar prices), never widen integer to number.
   it.each(Object.entries<string>(market.filters))("filter %s (%s) is not wider than the contract", (name, type) => {
-    const isFloat = filterParsers[name as keyof typeof filterParsers].parse("1.5") === 1.5;
-    expect(isFloat && type === "integer", `filter "${name}" is number in web but integer in the contract`).toBe(false);
+    const parsed = filterParsers[name as keyof typeof filterParsers].parse("1.5,2");
+    const isList = Array.isArray(parsed);
+    const isFloat = (isList ? parsed[0] : parsed) === 1.5;
+    expect(isList, `filter "${name}" list-ness vs contract`).toBe(type.endsWith("[]"));
+    expect(isFloat && type.startsWith("integer"), `filter "${name}" is number in web but integer in the contract`).toBe(false);
   });
 
   it("WHAT_IF_STEPS is inside the contract range", () => {

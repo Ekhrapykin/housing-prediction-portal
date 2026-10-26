@@ -1,6 +1,8 @@
 package com.hpp.market.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -13,6 +15,7 @@ import com.hpp.market.service.ExportService;
 import com.hpp.market.service.MarketService;
 import com.hpp.market.service.PropertyService;
 import com.hpp.market.service.WhatIfService;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -35,10 +38,11 @@ class MarketControllerTest {
     @Test
     void summaryHappyPath() throws Exception {
         when(market.summary(any())).thenReturn(new MarketSummary(50, 1, 2, 3, 4, 5));
-        mvc.perform(get("/api/market/summary?min_bedrooms=2"))
+        mvc.perform(get("/api/market/summary?bedrooms=2,4"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(50))
                 .andExpect(jsonPath("$.avg_price").value(1));
+        verify(market).summary(argThat(f -> f.bedrooms().equals(List.of(2, 4))));
     }
 
     @Test

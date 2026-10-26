@@ -18,8 +18,7 @@
     "price"
   ],
   "filters": {
-    "min_bedrooms": "integer",
-    "max_bedrooms": "integer",
+    "bedrooms": "integer[]",
     "min_price": "number",
     "max_price": "number",
     "min_school_rating": "number",

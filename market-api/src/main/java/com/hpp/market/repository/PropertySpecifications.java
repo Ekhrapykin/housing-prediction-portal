@@ -11,8 +11,7 @@ public final class PropertySpecifications {
 
     public static Specification<Property> from(MarketFilter f) {
         List<Specification<Property>> s = new ArrayList<>();
-        if (f.minBedrooms() != null) s.add((r, q, cb) -> cb.greaterThanOrEqualTo(r.get("bedrooms"), f.minBedrooms()));
-        if (f.maxBedrooms() != null) s.add((r, q, cb) -> cb.lessThanOrEqualTo(r.get("bedrooms"), f.maxBedrooms()));
+        if (f.bedrooms() != null && !f.bedrooms().isEmpty()) s.add((r, q, cb) -> r.get("bedrooms").in(f.bedrooms()));
         if (f.minPrice() != null) s.add((r, q, cb) -> cb.greaterThanOrEqualTo(r.get("price"), f.minPrice()));
         if (f.maxPrice() != null) s.add((r, q, cb) -> cb.lessThanOrEqualTo(r.get("price"), f.maxPrice()));
         if (f.minSchoolRating() != null) s.add((r, q, cb) -> cb.greaterThanOrEqualTo(r.get("schoolRating"), f.minSchoolRating()));

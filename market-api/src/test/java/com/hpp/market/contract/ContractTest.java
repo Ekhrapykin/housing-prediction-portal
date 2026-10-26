@@ -48,6 +48,13 @@ class ContractTest {
         return Set.of(Integer.class, Long.class, int.class, long.class).contains(c) ? "integer" : "number";
     }
 
+    /** A List<X> param is a comma-separated list: "integer[]" / "number[]". */
+    static String typeOf(java.lang.reflect.Type t) {
+        if (t instanceof java.lang.reflect.ParameterizedType p && p.getRawType() == java.util.List.class)
+            return typeOf((Class<?>) p.getActualTypeArguments()[0]) + "[]";
+        return typeOf((Class<?>) t);
+    }
+
     @Test
     void houseFeaturesMatchSchema() throws IOException {
         JsonNode schema = contract("house-features.schema.json");
@@ -117,7 +124,7 @@ class ContractTest {
         // @BindParam targets parameters, so read it from the canonical constructor
         var ctor = MarketFilter.class.getDeclaredConstructors()[0];
         for (var p : ctor.getParameters())
-            actual.put(p.getAnnotation(BindParam.class).value(), typeOf(p.getType()));
+            actual.put(p.getAnnotation(BindParam.class).value(), typeOf(p.getParameterizedType()));
         Map<String, String> expected = new TreeMap<>();
         contract("market.json").get("filters").fields().forEachRemaining(e -> expected.put(e.getKey(), e.getValue().asText()));
         assertThat(actual).isEqualTo(expected);

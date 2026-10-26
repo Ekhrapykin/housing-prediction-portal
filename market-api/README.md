@@ -62,7 +62,7 @@ Spring's relaxed binding lets any `application.yml` key be overridden by env var
 
 Base path `/api/market`. JSON uses snake_case (`spring.jackson.property-naming-strategy: SNAKE_CASE`). Every filter below is an optional query parameter on the first five rows.
 
-Filters: `min_bedrooms`, `max_bedrooms`, `min_price`, `max_price`, `min_school_rating`, `max_distance`, `min_year_built`, `max_year_built`.
+Filters: `bedrooms` (any of, `bedrooms=2,4`), `min_price`, `max_price`, `min_school_rating`, `max_distance`, `min_year_built`, `max_year_built`.
 
 | Method | Path | Purpose | Notes |
 |---|---|---|---|

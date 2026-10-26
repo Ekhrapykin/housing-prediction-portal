@@ -1,4 +1,4 @@
-import { createLoader, type SearchParams, createParser, type inferParserType, parseAsFloat, parseAsInteger, parseAsStringLiteral } from "nuqs/server";
+import { createLoader, type SearchParams, createParser, type inferParserType, parseAsArrayOf, parseAsFloat, parseAsInteger, parseAsStringLiteral } from "nuqs/server";
 
 // The market query vocabulary (contracts/market.json; lib/contracts.test.ts compares them). Kept out of
 // clients/market-paths.ts, which next.config.ts imports and which must stay free of nuqs and React.
@@ -13,8 +13,8 @@ export type SortKey = (typeof SORT_KEYS)[number];
 
 /** Every URL param of the market app, shared by the server loader and the client hooks. */
 export const filterParsers = {
-  min_bedrooms: parseAsInteger,
-  max_bedrooms: parseAsInteger,
+  /** Any of these counts, `?bedrooms=2,4`. */
+  bedrooms: parseAsArrayOf(parseAsInteger),
   min_price: parseAsInteger,
   max_price: parseAsInteger,
   min_year_built: parseAsInteger,
