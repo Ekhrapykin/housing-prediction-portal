@@ -58,6 +58,8 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npm run lint
+      # PageProps / LayoutProps are generated into .next/types; a fresh checkout has none until typegen or build.
+      - run: npx next typegen
       - run: npx tsc --noEmit
       - run: npm test
       - run: npm run build

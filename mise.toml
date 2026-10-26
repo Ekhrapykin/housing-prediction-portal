@@ -27,7 +27,7 @@ run = "npm run dev"
 [tasks."lint:web"]
 description = "Lint, typecheck and unit-test the Next.js portal"
 dir = "web"
-run = "npm run lint && npx tsc --noEmit && npm test"
+run = "npm run lint && npx next typegen && npx tsc --noEmit && npm test"
 
 [tasks.test]
 description = "Run pytest in both Python services and gradle test in market-api"
