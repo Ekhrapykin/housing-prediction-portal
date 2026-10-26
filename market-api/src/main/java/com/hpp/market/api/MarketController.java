@@ -1,4 +1,4 @@
-package com.hpp.market.web;
+package com.hpp.market.api;
 
 import com.hpp.market.dto.MarketFilter;
 import com.hpp.market.dto.MarketSummary;

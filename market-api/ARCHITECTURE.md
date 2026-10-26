@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart LR
-  W[web/MarketController] --> S[service/]
+  W[api/MarketController] --> S[service/]
   S --> R[repository/ + Specifications] --> H[(H2 locally / Postgres schema market in Docker)]
   S --> C[client/MlClient] --> ML[ml-api]
   W -.-> D[dto/]
@@ -15,7 +15,7 @@ flowchart LR
 
 | Layer | Package | Rule |
 |---|---|---|
-| Web | `web` | One `@RestController`. Binds and validates DTOs, delegates, sets download headers. No logic. |
+| API | `api` | One `@RestController`. Binds and validates DTOs, delegates, sets download headers. No logic. |
 | Service | `service` | Aggregation, paging/sort rules, what-if construction, export. Carries the `@Cacheable` annotations. |
 | Repository | `repository` | `JpaRepository` + `JpaSpecificationExecutor`. `PropertySpecifications.from(MarketFilter)` turns the filter into a `Specification`. |
 | Client | `client` | `MlClient`: the only code that calls ml-api; maps failures to `ResponseStatusException`s. |
@@ -73,7 +73,7 @@ Validation failures are 400 here and 422 in the Python services; the portal trea
 
 ## Request id
 
-`RequestIdFilter` (`web/`, `OncePerRequestFilter`, highest precedence) accepts a valid `X-Request-ID` (`^[A-Za-z0-9-]{1,64}$`) or generates a UUID4, puts it in the MDC as `requestId`, sets the response header, logs one line per request (method, path, status, ms, like the Python services) and clears the MDC in `finally`. `logging.pattern.level` prints it as `[req=...]`. `RequestIdInterceptor` on the ml-api `RestClient` copies it from the MDC to the outgoing call. Virtual threads are on, but a request runs start to finish on one thread and the ml-api call is made synchronously on it, so the thread-bound MDC is visible to the interceptor. If code ever hands work to another thread, it must copy the MDC itself.
+`RequestIdFilter` (`config/`, `OncePerRequestFilter`, highest precedence) accepts a valid `X-Request-ID` (`^[A-Za-z0-9-]{1,64}$`) or generates a UUID4, puts it in the MDC as `requestId`, sets the response header, logs one line per request (method, path, status, ms, like the Python services) and clears the MDC in `finally`. `logging.pattern.level` prints it as `[req=...]`. `RequestIdInterceptor` on the ml-api `RestClient` copies it from the MDC to the outgoing call. Virtual threads are on, but a request runs start to finish on one thread and the ml-api call is made synchronously on it, so the thread-bound MDC is visible to the interceptor. If code ever hands work to another thread, it must copy the MDC itself.
 
 There is no rate limit on what-if: the Caffeine cache and the `steps` cap (at most 50) bound its cost.
 

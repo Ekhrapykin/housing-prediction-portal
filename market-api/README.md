@@ -103,13 +103,13 @@ market-api/
 └── src/
     ├── main/java/com/hpp/market/
     │   ├── MarketApplication.java
-    │   ├── web/           # MarketController, RequestIdFilter
+    │   ├── api/           # MarketController
     │   ├── service/       # MarketService, PropertyService, WhatIfService, ExportService, Segment
     │   ├── repository/    # PropertyRepository, PropertySpecifications
     │   ├── client/        # MlClient
     │   ├── domain/        # Property (JPA entity)
     │   ├── dto/           # records: HouseFeatures, MarketFilter, WhatIfRequest, ...
-    │   ├── config/        # AppConfig, MlProperties, RequestIdInterceptor
+    │   ├── config/        # AppConfig, MlProperties, RequestIdFilter, RequestIdInterceptor
     │   ├── ingest/        # CsvPropertySync (CSV → market table on start)
     │   └── exception/     # ApiExceptionHandler (validation errors as ProblemDetail)
     ├── main/resources/    # application.yml, application-docker.yml
