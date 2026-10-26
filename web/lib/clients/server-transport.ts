@@ -2,9 +2,9 @@ import "server-only";
 import { unstable_rethrow } from "next/navigation";
 import { ESTIMATOR_API_URL, MARKET_API_URL } from "@/lib/backends";
 import { MARKET_REVALIDATE_S, SERVER_REQUEST_TIMEOUT_MS } from "@/lib/config";
-import { ApiError, readDetail, REQUEST_ID_HEADER } from "./errors";
+import { ApiError, REQUEST_ID_HEADER, toApiError } from "./errors";
 import { MARKET_BACKEND_PREFIX } from "./market-paths";
-import type { Backend, Options, Transport } from "./transport";
+import type { Backend, Get, Options } from "./transport";
 
 // Market data is shared and cheap to cache; estimates are user data, so never cached.
 // Only the uncached estimator reads carry a fresh request id: Next puts request headers in the fetch cache key,
@@ -18,7 +18,7 @@ const TARGETS: Record<Backend, (path: string) => { url: string; init: () => Requ
 };
 
 /** Server transport: calls the backends directly, GET only. Errors are readable messages (production strips thrown server-component messages). */
-export function createServerTransport({ fetch: doFetch = (u, i) => fetch(u, i), timeoutMs = SERVER_REQUEST_TIMEOUT_MS }: Options = {}): Transport {
+export function createServerTransport({ fetch: doFetch = (u, i) => fetch(u, i), timeoutMs = SERVER_REQUEST_TIMEOUT_MS }: Options = {}): Get {
   return async <T>(backend: Backend, path: string): Promise<T> => {
     const { url, init } = TARGETS[backend](path);
     const timeout = AbortSignal.timeout(timeoutMs);
@@ -29,10 +29,7 @@ export function createServerTransport({ fetch: doFetch = (u, i) => fetch(u, i), 
       unstable_rethrow(e); // Next's own errors (dynamic usage, notFound, redirect) must propagate; a timeout is not one
       throw new ApiError(0, `The ${backend} service ${timeout.aborted ? "timed out" : "is unreachable"}. Try again in a moment.`);
     }
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new ApiError(res.status, readDetail(body?.detail) ?? `The ${backend} service failed (${res.status})`, res.headers.get(REQUEST_ID_HEADER));
-    }
+    if (!res.ok) throw await toApiError(res, `The ${backend} service failed (${res.status})`);
     return res.json();
   };
 }

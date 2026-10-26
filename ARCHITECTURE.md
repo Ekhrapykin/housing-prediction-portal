@@ -128,7 +128,7 @@ The probes are the compose healthchecks (defined once in `docker-compose.yml`, n
 | market-api | `market-api/.../dto/HouseFeatures.java` | Validate the what-if base house |
 | web | `web/lib/house-schema.ts` (zod), `web/lib/types.ts` | Instant form errors, typed UI |
 
-Why mirror instead of share: three languages and four deployables; a shared package or codegen would be more machinery than a 7-field schema that hasn't changed. Each copy fails fast at its own boundary, and ml-api still validates last. Drift is caught by one contract test per service (`ml-api` and `estimator-api` `tests/test_contract.py`, market-api `ContractTest`, web `lib/contracts.test.ts` in `npm test`), all comparing the native schema with the files in `contracts/`. To change a bound: edit the contract first, then every mirror. Contracts are only read by tests, so no Docker image needs them. The trigger to go further is a fifth consumer: generate clients from ml-api's OpenAPI.
+Why mirror instead of share: three languages and four deployables; a shared package or codegen would be more machinery than a 7-field schema that hasn't changed. Each copy fails fast at its own boundary, and ml-api still validates last. Drift is caught by one contract test per service (`ml-api` and `estimator-api` `tests/test_contract.py`, market-api `ContractTest`, web `test/lib/contracts.test.ts` in `npm test`), all comparing the native schema with the files in `contracts/`. To change a bound: edit the contract first, then every mirror. Contracts are only read by tests, so no Docker image needs them. The trigger to go further is a fifth consumer: generate clients from ml-api's OpenAPI.
 
 ## Flow: create an estimate
 

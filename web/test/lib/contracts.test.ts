@@ -1,4 +1,4 @@
-// The portal's native mirrors against ../../contracts/*.json. A failure here means web drifted from the contract.
+// The portal's native mirrors against ../../../contracts/*.json. A failure here means web drifted from the contract.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -6,7 +6,7 @@ import { WHAT_IF_STEPS } from "@/lib/config";
 import { SEGMENT_KEYS, SORT_KEYS, filterParsers } from "@/lib/data/search-params";
 import { houseSchema } from "@/lib/house-schema";
 
-const contract = (f: string) => JSON.parse(readFileSync(new URL(`../../contracts/${f}`, import.meta.url), "utf8"));
+const contract = (f: string) => JSON.parse(readFileSync(new URL(`../../../contracts/${f}`, import.meta.url), "utf8"));
 const house = contract("house-features.schema.json");
 const market = contract("market.json");
 

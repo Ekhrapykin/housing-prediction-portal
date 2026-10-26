@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { CompareView } from "@/components/estimator/compare-view";
 import { PageHeader } from "@/components/page-header";
 import { dehydrateQueries, getQueryClient } from "@/lib/data/query-client";
-import { prefetchEstimatesByIds } from "@/lib/clients/server";
+import { prefetch, serverEstimator } from "@/lib/clients/server";
 
 export const metadata: Metadata = { title: "Compare estimates" };
 
@@ -15,7 +15,7 @@ export default async function ComparePage({ searchParams }: PageProps<"/estimato
     .filter((n) => Number.isInteger(n) && n > 0)
     .slice(0, 4);
   const qc = getQueryClient();
-  if (parsed.length >= 2) await prefetchEstimatesByIds(qc, parsed);
+  if (parsed.length >= 2) await prefetch(qc, serverEstimator.estimatesByIds(parsed));
   return (
     <>
       <PageHeader title="Compare" description="Properties side by side. The best value in each row is highlighted." />

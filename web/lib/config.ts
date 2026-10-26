@@ -1,4 +1,4 @@
-/** Timings and tuning for the portal. Page sizes live next to their loaders in data/server.ts. */
+/** Timings and tuning for the portal. Page sizes live next to their loaders in clients/market.ts. */
 
 /** Browser queries are fresh for 30 s: long enough to survive navigation, short enough that another tab's edits show up. */
 export const QUERY_STALE_TIME_MS = 30_000;

@@ -1,7 +1,7 @@
-import { createEstimatorClient } from "./estimator";
-import { createMarketClient } from "./market";
+import { createEstimatorMutations, createEstimatorQueries } from "./estimator";
+import { createMarketQueries } from "./market";
 import { browserTransport } from "./transport";
 
-/** The clients components use: queries, mutations and links over the browser transport. */
-export const estimator = createEstimatorClient(browserTransport);
-export const market = createMarketClient(browserTransport);
+/** The clients components use, over the browser transport. */
+export const estimator = { queries: createEstimatorQueries(browserTransport), mutations: createEstimatorMutations(browserTransport) };
+export const market = { queries: createMarketQueries(browserTransport) };

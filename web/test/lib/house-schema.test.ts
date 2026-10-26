@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EXAMPLE, FIELDS, bounds, houseSchema, isInteger, type FeatureName } from "./house-schema";
+import { EXAMPLE, FIELDS, bounds, houseSchema, isInteger, type FeatureName } from "@/lib/house-schema";
 
 const ok = (name: FeatureName, v: number) => houseSchema.safeParse({ ...EXAMPLE, [name]: v }).success;
 

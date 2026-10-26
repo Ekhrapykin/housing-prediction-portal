@@ -25,7 +25,7 @@ flowchart TB
 |---|---|---|
 | Routes | `app/` | Server components by default. Read `searchParams`, call a loader or prefetch, render. No `fetch` of their own. |
 | Client components | `components/` with `"use client"` | Interactivity only: forms, charts, sliders, tables. Data through hooks. |
-| Hooks | `hooks/` | Only hooks that add behaviour: `useCreateEstimate` / `useDeleteEstimate` (thin over the client mutations), `useWhatIf` and `useDebounce`, `useMarketFilters` (URL state). Plain reads are `useQuery(estimator.queries.x())` in the component. |
+| Hooks | `hooks/` | Only hooks that add behaviour: `useWhatIf` and `useDebounce`, `useMarketFilters` (URL state). Plain reads and mutations are `useQuery(estimator.queries.x())` / `useMutation(estimator.mutations.x(useQueryClient()))` in the component. |
 | Clients | `lib/clients/` | The only code that knows backend paths, query keys, cache policy, error mapping and invalidation. |
 | Data helpers | `lib/data/` | `query-client.ts`, and the nuqs `search-params.ts`, which is also where the market vocabulary lives (`SEGMENT_KEYS`, `SORT_KEYS`, `MarketFilters`). |
 | Schemas/format | `lib/house-schema.ts`, `lib/format.ts`, `lib/types.ts` | Shared by forms and display. `house-schema.ts` is the house vocabulary: the zod schema, `HouseFeatures` / `FeatureName` (inferred from it; `types.ts` re-exports them), `FIELDS`, `EXAMPLE` (the form placeholders come from it) and `bounds()` / `isInteger()`, both read from `z.toJSONSchema(houseSchema)` (an exclusive minimum such as `gt(0)` clamps at 1). |
@@ -37,22 +37,23 @@ Pages, layouts and the market `Dashboard` are server components; the market app 
 
 ## The `lib/clients` layer
 
-One module per backend. A client is built as `createEstimatorClient(transport)` / `createMarketClient(transport)`; the transport is the only thing that differs between the browser and the server.
+One module per backend. What a factory takes says where it can run: `Get` (GET only, `transport.ts`) works on both sides, `Transport` (`Get` plus POST / DELETE) only in the browser. `Get` types `method` / `body` as `undefined`, so the server transport is not assignable to `Transport` and `createEstimatorMutations(serverTransport)` fails to compile.
 
 ```mermaid
 flowchart LR
-  EC["createEstimatorClient(t)"] --> BT["browser transport<br/>/api/* rewrites, 10 s, abort"]
-  EC --> ST["server transport (server-only)<br/>env URLs, cache policy, 5 s"]
-  MC["createMarketClient(t)"] --> BT
-  MC --> ST
+  EQ["createEstimatorQueries(get)"] --> BT["browser transport<br/>/api/* rewrites, 10 s, abort"]
+  EQ --> ST["server transport (server-only)<br/>env URLs, cache policy, 5 s"]
+  ML["createMarketLoaders(get)"] --> ST
+  EM["createEstimatorMutations(t)"] --> BT
+  MQ["createMarketQueries(t)"] --> BT
 ```
 
-| Concern | Estimator client | Market client | Owner |
+| Concern | Estimator | Market | Owner |
 |---|---|---|---|
 | Paths | `estimator-paths.ts` | `market-paths.ts` | One dependency-free list per backend; `next.config.ts` builds the rewrite allow-list from it too |
-| Query keys + `queryOptions` | `queries.estimates / estimatesByIds / modelInfo` | `queries.whatIf` | The client; browser and server prefetch call the same builders |
-| Mutations + invalidation | `mutations.create / delete(qc)`, both invalidate `["estimates"]` | none | The client; hooks only call `useMutation(client.mutations.x(qc))` |
-| Server reads | via `prefetchQuery` (TanStack) | `dashboard(raw)`, `properties(raw)` returning `Result<T>` | Client, driven by `lib/clients/server.ts` |
+| Query keys + `queryOptions` | `createEstimatorQueries(get)`: `estimates / estimatesByIds / modelInfo` | `createMarketQueries(t).whatIf` | The factory; browser and server prefetch call the same builders |
+| Mutations + invalidation | `createEstimatorMutations(t)`: `create / delete(qc)`, both invalidate `["estimates"]` | none | The factory; hooks only call `useMutation(estimator.mutations.x(qc))` |
+| Server reads | via `prefetchQuery` (TanStack) | `createMarketLoaders(get)`: `dashboard(raw)`, `properties(raw)` returning `Result<T>` | Driven by `lib/clients/server.ts` |
 | Error mapping | `errors.ts`: `ApiError`, `readDetail`, `errorMessage`, `REQUEST_ID_HEADER` | same | Shared; each transport turns a failed response into an `ApiError` |
 
 | | Browser transport (`transport.ts`) | Server transport (`server-transport.ts`) |
@@ -62,13 +63,13 @@ flowchart LR
 | Cache / headers | none; no `X-Request-ID` (the backend generates it) | estimator: `no-store` + fresh `X-Request-ID`; market: `revalidate` 300 s, no request id (it would split the fetch cache) |
 | Errors | `readDetail` (FastAPI 422 list), 5xx fallback text, `X-Request-ID` into `ApiError.requestId` | same `readDetail`; `unstable_rethrow` first in the catch so Next's own errors propagate (a timeout is not one) |
 
-Why the market client is thinner: its reads are server loaders returning `Result<T>` (partial failure per region), not TanStack prefetches, so it has no query keys, no invalidation and no mutations. Only the what-if call goes through the browser, plus the export links (`market.exportUrl`).
+Why the market side is thinner: its reads are server loaders returning `Result<T>` (partial failure per region), not TanStack prefetches, so it has no query keys, no invalidation and no mutations. Only the what-if call goes through the browser, plus the export links (`exportUrl`, a plain function in `market.ts`).
 
-Wiring: `browser.ts` builds both clients over the browser transport (components and hooks import `estimator` / `market` from there); `server.ts` (`server-only`) builds them over the server transport and exports `loadMarketDashboard`, `loadProperties` and the `prefetch*` helpers, which call `connection()` first. `lib/data/query-client.ts` (`getQueryClient()`: new client per server request, singleton in the browser; defaults `staleTime` 30 s, `retry` 1, `retryOnMount: false`; pending and failed queries dehydrated) and `lib/data/search-params.ts` (nuqs parsers shared by the RSC loader, `useQueryStates` and `createSerializer`, plus `SEGMENT_KEYS` / `SORT_KEYS`; `market-paths.ts` stays free of nuqs because `next.config.ts` imports it). The URL-to-market-api translation (`page - 1`, `sort,dir`, and the `page + 1` inverse `urlPage`) is `pagingQuery` / `urlPage` in `clients/market.ts` next to `filtersQuery`; `PROPERTIES_PAGE_SIZE` and `SCATTER_SIZE` are exported from there (a test keeps them under market-api's max page size).
+Wiring: `browser.ts` builds the queries and mutations over the browser transport (components and hooks import `estimator` / `market` from there); `server.ts` (`server-only`) builds the estimator queries and market loaders over the server transport and exports `loadMarketDashboard`, `loadProperties` and `prefetch(qc, serverEstimator.x())` (pages pass the server-side estimator queries); loaders and `prefetch` call `connection()` first. `lib/data/query-client.ts` (`getQueryClient()`: new client per server request, singleton in the browser; defaults `staleTime` 30 s, `retry` 1, `retryOnMount: false`; pending and failed queries dehydrated) and `lib/data/search-params.ts` (nuqs parsers shared by the RSC loader, `useQueryStates` and `createSerializer`, plus `SEGMENT_KEYS` / `SORT_KEYS`; `market-paths.ts` stays free of nuqs because `next.config.ts` imports it). The URL-to-market-api translation (`page - 1`, `sort,dir`) is `pagingQuery` in `clients/market.ts` next to `filtersQuery`; the inverse is `toPropertiesView`, so the `properties` loader returns a 1-based `PropertiesView` (`page`, `lastPage`, `first`, `last`) and the table does no paging maths; `PROPERTIES_PAGE_SIZE` and `SCATTER_SIZE` are exported from there (a test keeps them under market-api's max page size).
 
 To add an estimator endpoint: add the path to `estimator-paths.ts` (and to `ESTIMATOR_PROXIED` if the browser calls it), then a `queries` entry or mutation in `estimator.ts`.
 
-`npm test` (vitest, node environment, specs next to the code) covers: the clients and transports against a fake `fetch` (error mapping, timeouts, abort, key/path equality, invalidation, the `page`/`sort` translation for market-api and its round trip), the URL parsers, formatters, the zod house schema (and `bounds()` / `isInteger()`), the query client's error dehydration, and `lib/contracts.test.ts`, which compares the zod schema, segment/sort keys, filter parsers and what-if steps with `../contracts`. `npm run e2e` (Playwright, `e2e/`) drives the market filters, properties, what-if and estimator pages in Chrome against a running compose stack; it is not in CI.
+`npm test` (vitest, node environment, specs in `test/`, mirroring the source path) covers: the clients and transports against a fake `fetch` (error mapping, timeouts, abort, key/path equality, invalidation, the `page`/`sort` translation for market-api, `toPropertiesView`, and a `@ts-expect-error` check that the server transport is GET-only), the URL parsers, formatters, the zod house schema (and `bounds()` / `isInteger()`), the query client's error dehydration, and `test/lib/contracts.test.ts`, which compares the zod schema, segment/sort keys, filter parsers and what-if steps with `../contracts`. `npm run e2e` (Playwright, `e2e/`) drives the market filters, properties, what-if and estimator pages in Chrome against a running compose stack; it is not in CI.
 
 ## Request flow: market dashboard
 
@@ -149,7 +150,7 @@ Market filters, segment (`by`), sort and page live in the query string. URL stat
 | Market app server-rendered from the URL | Shareable views, no client state to sync, and the cache can sit at the fetch layer. |
 | `Result<T>` instead of throwing | Partial failure per region and readable messages in production. |
 | One client per backend, over a transport | Paths, keys, error mapping and invalidation live in one place; browser and server prefetch share the same `queryOptions` and differ only in the fetcher. |
-| zod bounds mirror the backends | Instant field errors without a round-trip. `lib/contracts.test.ts` compares them with `contracts/` (also segment/sort keys, filter parsers, what-if steps) as part of `npm test`, in `mise run lint:web` and CI. |
+| zod bounds mirror the backends | Instant field errors without a round-trip. `test/lib/contracts.test.ts` compares them with `contracts/` (also segment/sort keys, filter parsers, what-if steps) as part of `npm test`, in `mise run lint:web` and CI. |
 
 ## Limitations
 

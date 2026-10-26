@@ -1,7 +1,7 @@
 import { dehydrate } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/clients/errors";
-import { getQueryClient } from "./query-client";
+import { getQueryClient } from "@/lib/data/query-client";
 
 describe("getQueryClient dehydration", () => {
   it("dehydrates a failed prefetch with a readable error", async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { featureValue, priceTicks, signedMoney } from "./format";
+import { featureValue, priceTicks, signedMoney } from "@/lib/format";
 
 describe("featureValue", () => {
   it("prints year_built without a thousands separator", () => expect(featureValue("year_built", 1997)).toBe("1997"));

@@ -1,11 +1,16 @@
 import { REQUEST_TIMEOUT_MS } from "@/lib/config";
-import { ApiError, readDetail, REQUEST_ID_HEADER } from "./errors";
+import { ApiError, toApiError } from "./errors";
 import { ESTIMATOR_BASE } from "./estimator-paths";
 import { MARKET_BASE } from "./market-paths";
 
 export type Backend = "estimator" | "market";
 export type Req = { method?: "POST" | "DELETE"; body?: string; signal?: AbortSignal };
-/** How a client reaches its backend: `path` is the backend path (with query string), the transport adds base URL, timeout and errors. */
+/**
+ * GET-only reach into a backend: `path` is the backend path (with query string), the transport adds base URL, timeout and errors.
+ * `method` / `body` are `undefined`-only so a function that can't send them (the server transport) is not assignable to `Transport`.
+ */
+export type Get = <T>(backend: Backend, path: string, req?: { signal?: AbortSignal; method?: undefined; body?: undefined }) => Promise<T>;
+/** Get plus POST / DELETE: what the browser can do. */
 export type Transport = <T>(backend: Backend, path: string, req?: Req) => Promise<T>;
 
 /** Injection points for tests. */
@@ -30,12 +35,8 @@ export function createBrowserTransport({ fetch: doFetch = (u, i) => fetch(u, i),
       if (timeout.aborted) throw new ApiError(0, "The request timed out. Try again.");
       throw new ApiError(0, "Can't reach the server. Check your connection and try again.");
     }
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      // A 5xx without `detail` comes from the Next rewrite proxy when the backend itself is down.
-      const fallback = res.status >= 500 ? "The service is unavailable right now. Try again in a moment." : `Request failed (${res.status})`;
-      throw new ApiError(res.status, readDetail(body?.detail) ?? fallback, res.headers.get(REQUEST_ID_HEADER));
-    }
+    // A 5xx without `detail` comes from the Next rewrite proxy when the backend itself is down.
+    if (!res.ok) throw await toApiError(res, res.status >= 500 ? "The service is unavailable right now. Try again in a moment." : `Request failed (${res.status})`);
     return res.status === 204 ? (undefined as T) : res.json();
   };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadSearchParams } from "./search-params";
+import { loadSearchParams } from "@/lib/data/search-params";
 
 describe("loadSearchParams", () => {
   it("applies defaults", () => {

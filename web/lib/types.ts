@@ -33,5 +33,7 @@ export type Summary = {
 export type SegmentRow = { segment: string; count: number; avg_price: number; avg_price_per_sqft: number };
 export type Property = HouseFeatures & { id: number; price: number };
 export type Page<T> = { items: T[]; total: number; page: number; size: number };
+/** A page of properties as the table shows it: `page` is 1-based, `first` / `last` are 1-based row numbers (0 when empty). */
+export type PropertiesView = { items: Property[]; total: number; page: number; lastPage: number; first: number; last: number };
 export type WhatIfPoint = { value: number; price: number };
 export type WhatIfParams = { base: HouseFeatures; feature: FeatureName; from: number; to: number; steps: number };

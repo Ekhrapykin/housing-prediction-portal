@@ -5,7 +5,7 @@ The Next.js portal that hosts both apps under one shell:
 - **Price Estimator** (`/estimator`, `/estimator/history`, `/estimator/compare`) is backed by [estimator-api](../estimator-api/README.md).
 - **Market Explorer** (`/market`, `/market/properties`, `/market/what-if`) is backed by [market-api](../market-api/README.md).
 
-The browser only talks to this app. Client code calls `/api/estimator/*` and `/api/market/*`, which `next.config.ts` rewrites to the backends. Server components call the backends directly through `lib/clients/server.ts` (the same clients over the server transport).
+The browser only talks to this app. Client code calls `/api/estimator/*` and `/api/market/*`, which `next.config.ts` rewrites to the backends. Server components call the backends directly through `lib/clients/server.ts` (the same estimator queries, plus the market loaders, over a GET-only server transport).
 
 ## Stack
 
@@ -111,16 +111,17 @@ web/
 │   ├── market/             # dashboard, filters, segment-chart, price-scatter, properties-table, what-if-*, export-buttons
 │   ├── ui/                 # shadcn primitives
 │   └── *.tsx               # nav, sub-nav, house-fields, error-state, route-error, skeletons
-├── hooks/                  # use-estimates, use-what-if, use-market-filters, use-debounce (what-if)
+├── hooks/                  # use-what-if, use-market-filters, use-debounce (what-if)
 ├── lib/
 │   ├── clients/            # estimator.ts, market.ts (per-backend clients), *-paths.ts, transport.ts (browser), server-transport.ts, browser.ts, server.ts, errors.ts
 │   ├── data/               # query-client.ts (error dehydration), search-params.ts (market vocabulary: SEGMENT_KEYS, SORT_KEYS, filter parsers)
 │   ├── config.ts           # timings and tuning: stale times, revalidate, debounces, request timeout, what-if steps
 │   ├── house-schema.ts     # zod schema, HouseFeatures types, FIELDS, EXAMPLE, bounds()/isInteger()
 │   ├── types.ts, format.ts, utils.ts
+├── test/                       # vitest specs (npm test), mirroring the source path: test/lib/**
 ├── e2e/                        # Playwright specs (npm run e2e), fixtures.ts
 ├── playwright.config.ts
-├── vitest.config.mts           # npm test; specs sit next to the code (lib/**/*.test.ts), e2e/ excluded
+├── vitest.config.mts           # npm test; specs in test/, e2e/ excluded
 ├── next.config.ts          # rewrites, standalone output
 └── Dockerfile
 ```

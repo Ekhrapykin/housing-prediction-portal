@@ -2,10 +2,11 @@
 import { MutationObserver, QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { SERVER_REQUEST_TIMEOUT_MS } from "@/lib/config";
-import { ApiError, errorMessage } from "./errors";
-import { createEstimatorClient } from "./estimator";
-import { createServerTransport } from "./server-transport";
-import { createBrowserTransport, type Transport } from "./transport";
+import { ApiError, errorMessage } from "@/lib/clients/errors";
+import { createEstimatorMutations, createEstimatorQueries } from "@/lib/clients/estimator";
+import { createMarketQueries } from "@/lib/clients/market";
+import { createServerTransport } from "@/lib/clients/server-transport";
+import { createBrowserTransport, type Get, type Transport } from "@/lib/clients/transport";
 
 // `server-only` throws outside Next's server build.
 vi.mock("server-only", () => ({}));
@@ -83,12 +84,13 @@ describe("server transport", () => {
 
 describe("estimator client", () => {
   const calls: string[] = [];
-  const fake = (tag: string): Transport => (async (backend, path, req) => (calls.push(`${tag} ${backend} ${req?.method ?? "GET"} ${path}`), [])) as Transport;
-  const browser = createEstimatorClient(fake("browser"));
-  const server = createEstimatorClient(fake("server"));
+  const fake = (tag: string) => (async (backend, path, req) => (calls.push(`${tag} ${backend} ${req?.method ?? "GET"} ${path}`), [])) as Transport;
+  const browser = createEstimatorQueries(fake("browser"));
+  const server = createEstimatorQueries((async (backend, path) => (calls.push(`server ${backend} GET ${path}`), [])) as Get);
+  const mutations = createEstimatorMutations(fake("browser"));
 
   it("has the same key and path whichever transport is used", async () => {
-    const makers = [(c: typeof browser) => c.queries.estimates(), (c: typeof browser) => c.queries.estimatesByIds([1, 2]), (c: typeof browser) => c.queries.modelInfo()];
+    const makers = [(c: typeof browser) => c.estimates(), (c: typeof browser) => c.estimatesByIds([1, 2]), (c: typeof browser) => c.modelInfo()];
     for (const make of makers) {
       const [a, b] = [make(browser), make(server)];
       expect(a.queryKey).toEqual(b.queryKey);
@@ -104,16 +106,28 @@ describe("estimator client", () => {
 
   it("invalidates the estimates key after create and delete", async () => {
     const qc = new QueryClient();
-    qc.setQueryData(browser.queries.estimates().queryKey, []);
-    qc.setQueryData(browser.queries.estimatesByIds([1, 2]).queryKey, []);
-    qc.setQueryData(browser.queries.modelInfo().queryKey, {} as never);
-    await new MutationObserver(qc, browser.mutations.create(qc)).mutate({ label: "x" } as never);
+    qc.setQueryData(browser.estimates().queryKey, []);
+    qc.setQueryData(browser.estimatesByIds([1, 2]).queryKey, []);
+    qc.setQueryData(browser.modelInfo().queryKey, {} as never);
+    await new MutationObserver(qc, mutations.create(qc)).mutate({ label: "x" } as never);
     const stale = (key: readonly unknown[]) => qc.getQueryState(key)!.isInvalidated;
-    expect(stale(browser.queries.estimates().queryKey)).toBe(true);
-    expect(stale(browser.queries.estimatesByIds([1, 2]).queryKey)).toBe(true);
-    expect(stale(browser.queries.modelInfo().queryKey)).toBe(false);
+    expect(stale(browser.estimates().queryKey)).toBe(true);
+    expect(stale(browser.estimatesByIds([1, 2]).queryKey)).toBe(true);
+    expect(stale(browser.modelInfo().queryKey)).toBe(false);
     expect(calls.at(-1)).toMatch(/^browser estimator POST \/estimates/);
-    await new MutationObserver(qc, browser.mutations.delete(qc)).mutate(7);
+    await new MutationObserver(qc, mutations.delete(qc)).mutate(7);
     expect(calls.at(-1)).toBe("browser estimator DELETE /estimates/7");
+  });
+});
+
+describe("transport types", () => {
+  it("the server transport is GET-only (checked by tsc, never called)", () => {
+    const typeOnly = () => {
+      // @ts-expect-error the server transport is GET-only
+      createEstimatorMutations(createServerTransport());
+      // @ts-expect-error what-if POSTs; the server transport can't
+      createMarketQueries(createServerTransport());
+    };
+    expect(typeOnly).toBeTypeOf("function");
   });
 });

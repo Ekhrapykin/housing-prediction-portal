@@ -19,6 +19,12 @@ export function readDetail(detail: unknown): string | null {
   return null;
 }
 
+/** A failed response as an ApiError: `detail` if the body has one, else `fallback`; the request id rides along. Both transports use it. */
+export async function toApiError(res: Response, fallback: string): Promise<ApiError> {
+  const body = await res.json().catch(() => null);
+  return new ApiError(res.status, readDetail(body?.detail) ?? fallback, res.headers.get(REQUEST_ID_HEADER));
+}
+
 /** Toast text. Appends a short reference to the request id so a user can quote it and the logs can be searched. */
 export const errorMessage = (e: unknown) => {
   if (!(e instanceof Error)) return "Something went wrong";

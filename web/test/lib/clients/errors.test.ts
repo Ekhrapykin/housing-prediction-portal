@@ -1,6 +1,6 @@
 // errorMessage with a request id is covered in clients.test.ts; these are the other branches.
 import { describe, expect, it } from "vitest";
-import { ApiError, errorMessage } from "./errors";
+import { ApiError, errorMessage } from "@/lib/clients/errors";
 
 describe("errorMessage", () => {
   it("appends the first 8 chars of the request id", () => {
