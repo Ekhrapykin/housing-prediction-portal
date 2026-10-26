@@ -14,15 +14,15 @@ flowchart LR
 | Layer | Module | Rule |
 |---|---|---|
 | Routes | `app/api/` | Declare path, status code and response model, delegate to a service. No SQL, no HTTP calls. |
-| Service | `app/services/estimates.py` | Use cases (`create`, `get`, `list`, `delete`). Raises domain errors. No FastAPI imports. |
+| Service | `app/services/estimates.py` | Use cases (`create`, `get`, `list`, `delete`). Raises `HTTPException(404)` for an unknown id; imports nothing else from FastAPI. |
 | Repository | `app/repositories/estimates.py` | The only place that queries the database; maps `EstimateRow` to `Estimate`. Takes a SQLAlchemy `Session`. |
-| Client | `app/clients/ml.py` | The only place that talks to ml-api; turns HTTP failures into domain errors. |
+| Client | `app/clients/ml.py` | The only place that talks to ml-api; turns its failures into `HTTPException` 503 / 502 / 422 (see [Errors](#errors)). |
 | Schemas | `app/schemas.py` | Request and response models. |
 | Rate limit | `app/core/ratelimit.py` | slowapi `Limiter`, `client_key`, trusted-proxy resolution, the 429 handler. Routes opt in with `@limiter.shared_limit`. |
 | Request id | `app/core/logging.py` | `asgi-correlation-id` middleware and log filter, our id validator, the access-log middleware and the log format. `MlClient` reads `correlation_id.get()` and forwards the id. |
 | Config / deps / db | `core/config.py`, `api/deps.py`, `repositories/db.py` | Settings, wiring, the ORM model and the `Session` dependency. `api/deps.py` is the composition root: it builds a service per request. `core/` imports nothing from `api/`, `services/`, `repositories/` or `clients/`. |
 
-Because the service takes plain collaborators, `test_estimate_service.py` runs it without FastAPI.
+Because the service takes plain collaborators, `test_estimate_service.py` runs it without the FastAPI app (no `TestClient`, no HTTP).
 
 ## Request flow: `POST /estimates`
 
@@ -95,7 +95,7 @@ SQLAlchemy 2.x with the typed declarative style (`DeclarativeBase`, `Mapped[...]
 | JSON text columns | Features are always read and written as a unit; no querying inside them. |
 | Session per request, commit in the dependency | One transaction per request; a failed handler rolls back. Sessions are never shared across threads. |
 | Feature schema duplicated from ml-api | Pinned to `contracts/house-features.schema.json` by `tests/test_contract.py`. Fails fast without a round-trip. |
-| Domain error hierarchy | Services and clients stay HTTP-agnostic; one handler owns the wire format. |
+| FastAPI's `HTTPException`, no custom error hierarchy | Four error cases and one wire format (`{detail}`) that FastAPI's default handler already renders. A domain hierarchy with its own handler would keep services HTTP-agnostic, but adds a layer nothing else needs yet. Cost: the service and `MlClient` import `HTTPException`. |
 | `/health` always 200 with `ml_api: up/down` | The service is alive even when its dependency is not; compose healthchecks stay stable. |
 
 ## Limitations
