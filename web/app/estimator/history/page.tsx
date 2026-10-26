@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { HistoryTable } from "@/components/estimator/history-table";
 import { PageHeader } from "@/components/page-header";
 import { getQueryClient } from "@/lib/data/query-client";
-import { prefetchEstimates } from "@/lib/data/server";
+import { prefetchEstimates } from "@/lib/clients/server";
 
 export const metadata: Metadata = { title: "Estimate history" };
 

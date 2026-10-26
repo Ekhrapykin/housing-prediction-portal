@@ -4,7 +4,7 @@ import { PriceScatter } from "@/components/market/price-scatter";
 import { SegmentChart } from "@/components/market/segment-chart";
 import { StatCard } from "@/components/stat-card";
 import type { SearchParams } from "nuqs/server";
-import { loadMarketDashboard } from "@/lib/data/server";
+import { loadMarketDashboard } from "@/lib/clients/server";
 import { money } from "@/lib/format";
 
 /** The data regions of the market page; async so the filter bar can render while this streams. */

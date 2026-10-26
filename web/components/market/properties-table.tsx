@@ -15,7 +15,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { createSerializer } from "nuqs";
-import type { SortKey } from "@/lib/data/endpoints";
+import type { SortKey } from "@/lib/clients/market-paths";
 import { propertiesParsers } from "@/lib/data/search-params";
 import { money, number } from "@/lib/format";
 import type { Page, Property } from "@/lib/types";

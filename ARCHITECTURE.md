@@ -48,7 +48,7 @@ Rules:
 | Contract | Detail |
 |---|---|
 | JSON naming | snake_case everywhere. Python models use snake_case fields; market-api sets `spring.jackson.property-naming-strategy: SNAKE_CASE` and binds snake_case query params with `@BindParam`. |
-| Errors | Non-2xx responses carry `{"detail": ...}`. estimator-api uses an `AppError` handler; market-api returns `ProblemDetail` (which has `detail`); ml-api uses FastAPI defaults. `detail` is a string, except FastAPI validation 422s, where it is a list of issues; the portal's `apiFetch` turns that list into a readable `field: message` string. Validation status differs: 422 in Python, 400 in Java. |
+| Errors | Non-2xx responses carry `{"detail": ...}`. estimator-api uses an `AppError` handler; market-api returns `ProblemDetail` (which has `detail`); ml-api uses FastAPI defaults. `detail` is a string, except FastAPI validation 422s, where it is a list of issues; the portal's transports (`web/lib/clients/errors.ts`) turn that list into a readable `field: message` string. Validation status differs: 422 in Python, 400 in Java. |
 | Health | ml-api and estimator-api `GET /health`, market-api `GET /actuator/health`, web `GET /`, postgres `pg_isready`. Compose healthchecks and `depends_on: service_healthy` order startup: postgres and ml-api, then the two app backends, then web. |
 | Feature schema | The 7 features with identical bounds are defined in four places, pinned to [`contracts/`](contracts/README.md) by contract tests (below). |
 
@@ -219,7 +219,7 @@ flowchart LR
 ## Future improvements
 
 - **Model selection.** Alpha is fixed at 10 and model quality was not optimised. Compare alphas, feature subsets and other models with nested CV, and add VIF to `/model-info`.
-- **Vitest for the web.** Move the contract check (`web/scripts/check-contracts.ts`) into a vitest suite and add unit tests for the zod schema, `apiFetch` and the URL parsers.
+- **Vitest for the web.** Vitest already runs the clients spec (`web/lib/clients/clients.test.ts`); move the contract check (`web/scripts/check-contracts.ts`) into it and add unit tests for the zod schema and the URL parsers.
 - **Generated web types.** Generate the web's response types from the backends' OpenAPI (`openapi-typescript`) instead of the hand-written `lib/types.ts`.
 - **On-the-fly retraining.** `POST /admin/retrain` in ml-api reads the (new) CSV, validates it (columns, ranges, row count), trains, and swaps the in-memory model only if the CV metrics pass a threshold (for example R2 not below the current model's minus a tolerance). A `model_runs` table would log every attempt with metrics, data hash and outcome, which also gives the model versioning ml-api lacks today.
 - **Migrations.** Alembic for estimator-api and Flyway for market-api once a column has to change on live data; `create_all` and `ddl-auto: create` only handle the first creation.

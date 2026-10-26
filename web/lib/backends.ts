@@ -1,5 +1,5 @@
 /**
- * Backend base URLs, shared by next.config.ts (rewrites, fixed at build) and lib/data/server.ts (fetches, at runtime).
+ * Backend base URLs, shared by next.config.ts (rewrites, fixed at build) and lib/clients/server-transport.ts (fetches, at runtime).
  * Defaults are the compose service names; `next dev` defaults to localhost so it works without .env.local.
  * No imports on purpose: next.config.ts loads this file.
  */

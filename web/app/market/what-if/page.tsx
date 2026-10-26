@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/page-header";
 import { WhatIfTool } from "@/components/market/what-if-tool";
 import { getQueryClient } from "@/lib/data/query-client";
-import { prefetchModelInfo } from "@/lib/data/server";
+import { prefetchModelInfo } from "@/lib/clients/server";
 
 export const metadata: Metadata = { title: "What-if" };
 

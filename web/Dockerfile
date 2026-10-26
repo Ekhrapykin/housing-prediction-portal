@@ -19,7 +19,7 @@ RUN mkdir -p public && npm run build
 FROM node:26-alpine
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
-# Same URLs again at runtime for the server-side fetches (lib/data/server.ts).
+# Same URLs again at runtime for the server-side fetches (lib/clients/server-transport.ts).
 ARG ESTIMATOR_API_URL=http://estimator-api:8001
 ARG MARKET_API_URL=http://market-api:8080
 ENV ESTIMATOR_API_URL=$ESTIMATOR_API_URL MARKET_API_URL=$MARKET_API_URL

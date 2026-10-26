@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { WHAT_IF_STEPS } from "../lib/config";
-import { SORT_KEYS } from "../lib/data/endpoints";
+import { SORT_KEYS } from "../lib/clients/market-paths";
 import { filterParsers } from "../lib/data/search-params";
 import { houseSchema } from "../lib/house-schema";
 import { SEGMENT_KEYS } from "../lib/types";

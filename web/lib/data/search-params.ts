@@ -1,6 +1,6 @@
 import { createLoader, type SearchParams, createParser, parseAsFloat, parseAsInteger, parseAsStringLiteral } from "nuqs/server";
 import { SEGMENT_KEYS } from "@/lib/types";
-import { SORT_KEYS } from "./endpoints";
+import { SORT_KEYS } from "@/lib/clients/market-paths";
 
 /** Every URL param of the market app, shared by the server loader and the client hooks. */
 export const filterParsers = {

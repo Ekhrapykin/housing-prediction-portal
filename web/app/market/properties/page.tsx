@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ErrorState } from "@/components/error-state";
 import { PageHeader } from "@/components/page-header";
 import { PropertiesTable } from "@/components/market/properties-table";
-import { loadProperties } from "@/lib/data/server";
+import { loadProperties } from "@/lib/clients/server";
 
 export const metadata: Metadata = { title: "Properties" };
 

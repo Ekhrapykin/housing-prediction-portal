@@ -17,3 +17,6 @@ export const WHAT_IF_STEPS = 25;
 
 /** Browser fetches give up after this long; a slow what-if is better surfaced than hung. */
 export const REQUEST_TIMEOUT_MS = 10_000;
+
+/** Server renders block on backend reads, so they give up sooner than the browser does. */
+export const SERVER_REQUEST_TIMEOUT_MS = 5_000;

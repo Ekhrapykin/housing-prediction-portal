@@ -11,12 +11,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useDeleteEstimate } from "@/hooks/use-estimates";
-import { errorMessage } from "@/lib/api";
-import { queries } from "@/lib/data/queries";
+import { estimator } from "@/lib/clients/browser";
+import { errorMessage } from "@/lib/clients/errors";
 import { date, money, number } from "@/lib/format";
 
 export function HistoryTable() {
-  const { data, isPending, isError, error, refetch } = useQuery(queries.estimates());
+  const { data, isPending, isError, error, refetch } = useQuery(estimator.queries.estimates());
   const del = useDeleteEstimate();
   const [selected, setSelected] = useState<number[]>([]);
 

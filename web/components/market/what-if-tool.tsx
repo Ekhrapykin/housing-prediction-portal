@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
 import { useWhatIf } from "@/hooks/use-what-if";
-import { queries } from "@/lib/data/queries";
+import { estimator } from "@/lib/clients/browser";
 import { BOUNDS, FIELDS, FIELD_LABEL, estimateSchema, houseSchema, type EstimateFormValues } from "@/lib/house-schema";
 import { featureValue, number, signedMoney } from "@/lib/format";
 import type { FeatureName, FeatureStat, HouseFeatures, ModelInfo } from "@/lib/types";
@@ -156,7 +156,7 @@ function WhatIf({ info }: { info: ModelInfo }) {
 }
 
 export function WhatIfTool() {
-  const { data, isPending, isError, error, refetch } = useQuery(queries.modelInfo());
+  const { data, isPending, isError, error, refetch } = useQuery(estimator.queries.modelInfo());
   if (isPending) return <Skeleton className="h-96 w-full" />;
   if (isError) return <ErrorState title="What-if is unavailable" message={error.message} onRetry={() => refetch()} />;
   return <WhatIf info={data} />;

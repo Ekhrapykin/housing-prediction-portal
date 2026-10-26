@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { CompareView } from "@/components/estimator/compare-view";
 import { PageHeader } from "@/components/page-header";
 import { getQueryClient } from "@/lib/data/query-client";
-import { prefetchEstimatesByIds } from "@/lib/data/server";
+import { prefetchEstimatesByIds } from "@/lib/clients/server";
 
 export const metadata: Metadata = { title: "Compare estimates" };
 

@@ -32,7 +32,7 @@ Every non-2xx response carries a JSON body with `detail`:
 - Python services (ml-api, estimator-api) answer validation failures with **422**; the Java service (market-api) answers with **400** (`ProblemDetail`, which has `detail`).
 - market-api validation messages name fields by their snake_case JSON path (`base.square_footage`), like the Python services' `loc`.
 - Status 429 (estimator-api writes) also carries `Retry-After`.
-- Clients must accept both shapes; the portal's `apiFetch` turns the list into a readable `field: message` string.
+- Clients must accept both shapes; the portal's `readDetail` (`web/lib/clients/errors.ts`, used by both its browser and server transports) turns the list into a readable `field: message` string.
 
 ## Request ID
 

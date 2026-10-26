@@ -8,14 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { queries } from "@/lib/data/queries";
+import { estimator } from "@/lib/clients/browser";
 import { FIELDS } from "@/lib/house-schema";
 import { featureValue, money, priceTicks } from "@/lib/format";
 import type { Estimate } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function CompareView({ ids }: { ids: number[] }) {
-  const { data, isPending, isError, error, refetch } = useQuery(queries.estimatesByIds(ids));
+  const { data, isPending, isError, error, refetch } = useQuery(estimator.queries.estimatesByIds(ids));
 
   if (ids.length < 2)
     return (

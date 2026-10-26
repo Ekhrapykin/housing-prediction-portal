@@ -5,13 +5,13 @@ import { ContributionChart } from "@/components/estimator/contribution-chart";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { queries } from "@/lib/data/queries";
+import { estimator } from "@/lib/clients/browser";
 import { FIELDS } from "@/lib/house-schema";
 import { featureValue, money, signedMoney } from "@/lib/format";
 import type { Estimate } from "@/lib/types";
 
 export function EstimateResult({ estimate }: { estimate: Estimate }) {
-  const info = useQuery(queries.modelInfo()).data;
+  const info = useQuery(estimator.queries.modelInfo()).data;
   const rows = FIELDS.map((f) => {
     const value = estimate.features[f.name];
     const mean = info?.feature_stats[f.name].mean;

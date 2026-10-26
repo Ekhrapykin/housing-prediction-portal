@@ -1,10 +1,10 @@
 import type { NextConfig } from "next";
 import { ESTIMATOR_API_URL, MARKET_API_URL } from "./lib/backends";
-import { ESTIMATOR_BASE, MARKET_BASE, paths } from "./lib/data/endpoints";
+import { ESTIMATOR_BASE, ESTIMATOR_PROXIED } from "./lib/clients/estimator-paths";
+import { MARKET_BACKEND_PREFIX, MARKET_BASE, MARKET_PROXIED } from "./lib/clients/market-paths";
 
-// Only what the UI calls is proxied, so the backends' /docs and /openapi.json are not reachable through the portal.
-const estimatorPaths = [paths.estimator.estimates, paths.estimator.estimate(":id"), paths.estimator.modelInfo];
-const marketPaths = [paths.market.summary, paths.market.segments, paths.market.properties, paths.market.whatIf, paths.market.exportCsv, paths.market.exportPdf];
+// Only what the UI calls is proxied (the per-backend path modules list it), so the backends' /docs and /openapi.json
+// are not reachable through the portal. Those modules have no imports: this file must not pull in React or server-only.
 
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -27,12 +27,12 @@ const nextConfig: NextConfig = {
     },
   },
   // Rewrite destinations are fixed at `next build` (they land in the routes manifest), unlike the server
-  // loaders in lib/data/server.ts, which read the same env vars at runtime. Provide the same
+  // loaders in lib/clients/server-transport.ts, which read the same env vars at runtime. Provide the same
   // ESTIMATOR_API_URL / MARKET_API_URL at build time too (Docker build args), or the browser hits the defaults.
   async rewrites() {
     return [
-      ...estimatorPaths.map((p) => ({ source: `${ESTIMATOR_BASE}${p}`, destination: `${ESTIMATOR_API_URL}${p}` })),
-      ...marketPaths.map((p) => ({ source: `${MARKET_BASE}${p}`, destination: `${MARKET_API_URL}/api/market${p}` })),
+      ...ESTIMATOR_PROXIED.map((p) => ({ source: `${ESTIMATOR_BASE}${p}`, destination: `${ESTIMATOR_API_URL}${p}` })),
+      ...MARKET_PROXIED.map((p) => ({ source: `${MARKET_BASE}${p}`, destination: `${MARKET_API_URL}${MARKET_BACKEND_PREFIX}${p}` })),
     ];
   },
   async headers() {

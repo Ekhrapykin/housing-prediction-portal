@@ -13,15 +13,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCreateEstimate } from "@/hooks/use-estimates";
-import { errorMessage } from "@/lib/api";
-import { queries } from "@/lib/data/queries";
+import { estimator } from "@/lib/clients/browser";
+import { errorMessage } from "@/lib/clients/errors";
 import { EXAMPLE, estimateSchema, type EstimateFormValues } from "@/lib/house-schema";
 import type { Estimate } from "@/lib/types";
 
 export function EstimateForm() {
   const form = useForm<EstimateFormValues>({ resolver: zodResolver(estimateSchema) });
   const create = useCreateEstimate();
-  const info = useQuery(queries.modelInfo());
+  const info = useQuery(estimator.queries.modelInfo());
   const [estimate, setEstimate] = useState<Estimate | null>(null);
 
   const onSubmit = form.handleSubmit((values) => {

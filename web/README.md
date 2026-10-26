@@ -5,7 +5,7 @@ The Next.js portal that hosts both Task 2 apps under one shell:
 - **Price Estimator** (`/estimator`, `/estimator/history`, `/estimator/compare`) is backed by [estimator-api](../estimator-api/README.md).
 - **Market Explorer** (`/market`, `/market/properties`, `/market/what-if`) is backed by [market-api](../market-api/README.md).
 
-The browser only talks to this app. Client code calls `/api/estimator/*` and `/api/market/*`, which `next.config.ts` rewrites to the backends. Server components call the backends directly through `lib/data/server.ts`.
+The browser only talks to this app. Client code calls `/api/estimator/*` and `/api/market/*`, which `next.config.ts` rewrites to the backends. Server components call the backends directly through `lib/clients/server.ts` (the same clients over the server transport).
 
 Internals: [ARCHITECTURE.md](ARCHITECTURE.md). System context: [../README.md](../README.md).
 
@@ -51,12 +51,12 @@ The backend URLs are build args because rewrites are fixed at `next build`; the 
 
 | Env var | Default (code) | `.env.example` | Read at |
 |---|---|---|---|
-| `ESTIMATOR_API_URL` | `http://estimator-api:8001` | `http://localhost:8001` | build (rewrites) and runtime (`lib/data/server.ts`) |
-| `MARKET_API_URL` | `http://market-api:8080` | `http://localhost:8080` | build (rewrites) and runtime (`lib/data/server.ts`) |
+| `ESTIMATOR_API_URL` | `http://estimator-api:8001` | `http://localhost:8001` | build (rewrites) and runtime (`lib/clients/server-transport.ts`) |
+| `MARKET_API_URL` | `http://market-api:8080` | `http://localhost:8080` | build (rewrites) and runtime (`lib/clients/server-transport.ts`) |
 
-Request ids: server-side estimator reads send a fresh `crypto.randomUUID()` as `X-Request-ID`; `apiFetch` stores the id of an error response on `ApiError.requestId` and `errorMessage()` appends ` · ref <first 8 chars>` to toasts. No configuration.
+Request ids: server-side estimator reads send a fresh `crypto.randomUUID()` as `X-Request-ID`; the browser transport stores the id of an error response on `ApiError.requestId` and `errorMessage()` appends ` · ref <first 8 chars>` to toasts. No configuration.
 
-The defaults live in `lib/backends.ts`, imported by both `next.config.ts` and `lib/data/server.ts`. In production (and so in the Docker build) they are the compose service names; when `NODE_ENV` is `development` (`npm run dev`) they are `http://localhost:8001` and `http://localhost:8080`, so the portal works without `.env.local`.
+The defaults live in `lib/backends.ts`, imported by both `next.config.ts` and `lib/clients/server-transport.ts`. In production (and so in the Docker build) they are the compose service names; when `NODE_ENV` is `development` (`npm run dev`) they are `http://localhost:8001` and `http://localhost:8080`, so the portal works without `.env.local`.
 
 ## Routes
 
@@ -70,7 +70,7 @@ The defaults live in `lib/backends.ts`, imported by both `next.config.ts` and `l
 | `/market/properties?page=&sort=` | server-rendered, 15 per page | `GET /properties` |
 | `/market/what-if` | RSC prefetch of model info, client tool | `POST /what-if` (debounced, `WHAT_IF_DEBOUNCE_MS`) |
 
-Proxied paths (an allow-list built from `paths` in `lib/data/endpoints.ts`): `/api/estimator/{estimates,estimates/:id,model-info}` to `${ESTIMATOR_API_URL}/...`, and `/api/market/{summary,segments,properties,what-if,export.csv,export.pdf}` to `${MARKET_API_URL}/api/market/...`. The CSV and PDF export links use the latter directly. Anything else, such as the backends' `/docs` and `/openapi.json`, is a 404 through the portal.
+Proxied paths (an allow-list built from `lib/clients/estimator-paths.ts` and `market-paths.ts`): `/api/estimator/{estimates,estimates/:id,model-info}` to `${ESTIMATOR_API_URL}/...`, and `/api/market/{summary,segments,properties,what-if,export.csv,export.pdf}` to `${MARKET_API_URL}/api/market/...`. The CSV and PDF export links use the latter directly. Anything else, such as the backends' `/docs` and `/openapi.json`, is a 404 through the portal.
 
 Every response carries `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, `Content-Security-Policy: frame-ancestors 'none'` (frame-ancestors only, no full CSP) and a `Permissions-Policy` disabling camera, microphone and geolocation (`headers()` in `next.config.ts`). `X-Powered-By` is off. The tab icon is `app/icon.svg`, a house glyph in the primary colour.
 
@@ -81,6 +81,7 @@ There are no unit or e2e tests in `web/` (vitest is a future step). Quality gate
 ```bash
 npm run lint          # eslint .
 npx tsc --noEmit
+npm test                  # vitest: transports and clients against a fake fetch
 npm run check:contracts   # scripts/check-contracts.ts (tsx): zod house schema, segment/sort keys, filter parsers and what-if steps vs ../contracts
 npm run build         # needs network for fonts
 ```
@@ -99,12 +100,13 @@ web/
 │   └── *.tsx               # nav, sub-nav, house-fields, error-state, route-error, skeletons
 ├── hooks/                  # use-estimates, use-what-if, use-market-filters, use-debounce (what-if)
 ├── lib/
-│   ├── data/               # endpoints.ts, queries.ts, server.ts, query-client.ts
-│   ├── api.ts              # browser apiFetch (timeout, cancellation) + ApiError
+│   ├── clients/            # estimator.ts, market.ts (per-backend clients), *-paths.ts, transport.ts (browser), server-transport.ts, browser.ts, server.ts, errors.ts
+│   ├── data/               # query-client.ts, search-params.ts
 │   ├── config.ts           # timings and tuning: stale times, revalidate, debounces, request timeout, what-if steps
 │   ├── house-schema.ts     # zod schema, field metadata, bounds
 │   ├── types.ts, format.ts, utils.ts
 ├── scripts/check-contracts.ts  # npm run check:contracts
+├── vitest.config.mts           # npm test; specs sit next to the code (lib/clients/clients.test.ts)
 ├── next.config.ts          # rewrites, standalone output
 └── Dockerfile
 ```

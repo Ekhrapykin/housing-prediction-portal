@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { EstimateForm } from "@/components/estimator/estimate-form";
 import { PageHeader } from "@/components/page-header";
 import { getQueryClient } from "@/lib/data/query-client";
-import { prefetchModelInfo } from "@/lib/data/server";
+import { prefetchModelInfo } from "@/lib/clients/server";
 
 export const metadata: Metadata = { title: "Estimator" };
 

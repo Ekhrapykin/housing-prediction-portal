@@ -60,7 +60,7 @@ Against the task PDF ("Interview Tasks Fullstack"), paraphrased. "Partial" rows 
 | **App 2 backend (Java):** REST endpoints, aggregate stats, ml-api integration | `market-api` `/api/market/summary`, `/segments`, `/properties`, `/what-if` (JPA Specifications; what-if calls ml-api batch) | Done |
 | Caching for performance | Caffeine cache on summary, segments and what-if in market-api; Next.js data cache (5 min) for market reads in the portal | Done |
 | App Router; server and client components used appropriately | RSC pages and loaders; client components only for forms, charts, tables, filters | Done |
-| RSC for initial data loading | `web/lib/data/server.ts` loaders and TanStack Query prefetch/hydration | Done |
+| RSC for initial data loading | `web/lib/clients/server.ts` loaders and TanStack Query prefetch/hydration | Done |
 | Data fetching strategy | server loaders (market), TanStack Query (estimator, what-if), rewrites as same-origin proxy | Done |
 | Custom hooks for shared functionality | `web/hooks/` (`use-estimates`, `use-what-if`, `use-market-filters`, `use-debounce`) | Done |
 | Responsive layouts with Tailwind | Tailwind 4 utility classes throughout | Done, checked by eye, no device matrix |
@@ -70,7 +70,7 @@ Against the task PDF ("Interview Tasks Fullstack"), paraphrased. "Partial" rows 
 | Cohesive modern UI | shadcn/Tailwind theme | Done (subjective) |
 | Client-side state management | URL state (nuqs), TanStack Query cache, local component state; no global store | Done |
 | Form state with validation | react-hook-form + zod | Done |
-| Efficient data fetching and API error handling | query caching and stale times, abort/timeouts, `{detail}` normalised in `web/lib/api.ts` | Done |
+| Efficient data fetching and API error handling | query caching and stale times, abort/timeouts, `{detail}` normalised in `web/lib/clients/errors.ts` (shared by the browser and server transports) | Done |
 | Next.js code organisation | `app/`, `components/`, `hooks/`, `lib/` | Done |
 | Python 3.12+, FastAPI, Java 21, Spring Boot 3.4.4 | `pyproject.toml` (3.14), `market-api` (Java 21, Boot 3.4.4) | Done |
 | Source on GitHub | This repository; not pushed yet | Partial |
