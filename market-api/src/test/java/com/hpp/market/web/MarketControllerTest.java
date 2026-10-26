@@ -16,11 +16,9 @@ import com.hpp.market.service.WhatIfService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.server.ResponseStatusException;
 
 @WebMvcTest(MarketController.class)
 class MarketControllerTest {
@@ -66,12 +64,11 @@ class MarketControllerTest {
     }
 
     @Test
-    void unknownWhatIfFeatureIs400WithDetail() throws Exception {
-        when(whatIf.whatIf(any())).thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown feature 'x'"));
+    void whatIfFromNotBelowToIs400() throws Exception {
         mvc.perform(post("/api/market/what-if").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"base\":" + BASE + ",\"feature\":\"x\",\"from\":1,\"to\":2,\"steps\":3}"))
+                        .content("{\"base\":" + BASE + ",\"feature\":\"bedrooms\",\"from\":3,\"to\":3,\"steps\":3}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value("Unknown feature 'x'"));
+                .andExpect(jsonPath("$.detail").value("\"from\" must be less than \"to\""));
     }
 
     @Test

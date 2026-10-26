@@ -6,8 +6,10 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hpp.market.config.RequestIdInterceptor;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +32,7 @@ class MlClientTest {
     void setUp() {
         var builder = RestClient.builder().baseUrl("http://ml").requestInterceptor(new RequestIdInterceptor());
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new MlClient(builder.build());
+        client = new MlClient(builder.build(), new ObjectMapper());
     }
 
     @Test
@@ -48,6 +50,53 @@ class MlClientTest {
         assertThatThrownBy(() -> client.predictBatch(List.of(Map.of("a", 1))))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
+    }
+
+    private void assertRejected(HttpStatus status, String body, HttpStatus expected, String message) {
+        server.expect(requestTo("http://ml/predict/batch"))
+                .andRespond(withStatus(status).body(body).contentType(MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> client.predictBatch(List.of(Map.of("a", 1))))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
+                    assertThat(e.getStatusCode()).isEqualTo(expected);
+                    assertThat(e.getReason()).isEqualTo(message);
+                });
+    }
+
+    @Test
+    void validationListBecomes400WithFieldAndMessage() {
+        assertRejected(HttpStatus.UNPROCESSABLE_ENTITY, """
+                {"detail":[{"loc":["body",0,"year_built"],"msg":"Input should be greater than or equal to 1800","type":"x"},
+                           {"loc":["body",0,"bedrooms"],"msg":"Input should be less than or equal to 20"}]}""",
+                HttpStatus.BAD_REQUEST,
+                "year_built: Input should be greater than or equal to 1800; bedrooms: Input should be less than or equal to 20");
+    }
+
+    @Test
+    void repeatedIssuesAcrossVariantsAreReportedOnce() {
+        assertRejected(HttpStatus.UNPROCESSABLE_ENTITY, """
+                {"detail":[{"loc":["body",0,"year_built"],"msg":"Input should be greater than or equal to 1800","type":"x"},
+                           {"loc":["body",1,"year_built"],"msg":"Input should be greater than or equal to 1800","type":"x"}]}""",
+                HttpStatus.BAD_REQUEST, "year_built: Input should be greater than or equal to 1800");
+    }
+
+    @Test
+    void stringDetailPassesThrough() {
+        assertRejected(HttpStatus.BAD_REQUEST, "{\"detail\":\"Batch too large\"}", HttpStatus.BAD_REQUEST, "Batch too large");
+    }
+
+    @Test
+    void unparsable422FallsBackToGenericMessage() {
+        assertRejected(HttpStatus.UNPROCESSABLE_ENTITY, "not json", HttpStatus.BAD_REQUEST,
+                "Prediction service rejected the input");
+    }
+
+    @Test
+    void unreachableUpstreamBecomes503() {
+        server.expect(requestTo("http://ml/predict/batch"))
+                .andRespond(request -> { throw new java.net.ConnectException("refused"); });
+        assertThatThrownBy(() -> client.predictBatch(List.of(Map.of("a", 1))))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
     }
 
     @AfterEach

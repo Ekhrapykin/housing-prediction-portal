@@ -42,10 +42,10 @@ sequenceDiagram
   alt hit
     K-->>S: points
   else miss
-    S->>S: build N variants, round integer features
+    S->>S: build variants, round integer features, drop duplicate values
     S->>M: predictBatch(variants)
     M->>ML: POST /predict/batch (HTTP/1.1)
-    ML-->>M: N predictions
+    ML-->>M: one prediction per variant
     M-->>S: prices in order
     S->>K: store (errors are never cached)
   end
@@ -59,11 +59,15 @@ sequenceDiagram
 
 | Exception | Status | Source |
 |---|---|---|
-| `ResponseStatusException` | 400 | unknown sort property or what-if feature; ml-api answered 400/422 |
+| `ResponseStatusException` | 400 | unknown sort property or what-if feature; ml-api answered 400/422 (its `detail` is passed through, see below) |
 | `ResponseStatusException` | 502 | ml-api 5xx or a malformed/mismatched response |
 | `ResponseStatusException` | 503 | connect/read timeout or connection failure |
-| `MethodArgumentNotValidException` | 400 | request-body validation; `detail` is `field message; ...`, field paths in snake_case (`base.square_footage`, converted with Jackson's `SNAKE_CASE` strategy) |
+| `MethodArgumentNotValidException` | 400 | request-body validation; `detail` is `field message; ...`, field paths in snake_case (`base.square_footage`, converted with Jackson's `SNAKE_CASE` strategy). `from >= to` is an `@AssertTrue` on `WhatIfRequest`, reported as just `"from" must be less than "to"` (cross-field `@AssertTrue` rules print their message without a field prefix) |
 | Spring MVC defaults | 400 | bad `by` enum, missing parameter, type mismatch (via the base class) |
+
+**ml-api rejections.** `MlClient` parses FastAPI's body: a 422 `{"detail":[{"loc":[...],"msg":"..."}]}` becomes a 400 whose detail is `<last loc element>: <msg>` joined with `; ` (e.g. `year_built: Input should be greater than or equal to 1800`); a 400 string `detail` passes through as is. If the body can't be parsed it falls back to `Prediction service rejected the input`. This is why the Java side keeps no second copy of the feature bounds for the varied range. Other 4xx/5xx from ml-api are 502; unreachable is 503.
+
+**What-if dedup.** Integer features (`bedrooms`, `year_built`) are rounded per step, so many steps can land on the same value (bedrooms 1 to 3 in 50 steps). Duplicates are dropped (first occurrence, order kept) and ml-api is sent only the distinct variants, so the curve has no repeated x values and may have fewer than `steps` points.
 
 Validation failures are 400 here and 422 in the Python services; the portal treats any non-2xx `detail` the same way.
 

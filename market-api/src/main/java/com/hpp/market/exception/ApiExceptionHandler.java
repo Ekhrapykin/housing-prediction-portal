@@ -21,7 +21,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         String detail = ex.getBindingResult().getFieldErrors().stream()
-                .map(f -> snakeCase(f.getField()) + " " + f.getDefaultMessage())
+                // @AssertTrue marks a cross-field rule (e.g. from < to): its "field" is a getter name, and the
+                // message already names the fields, so print the message alone.
+                .map(f -> "AssertTrue".equals(f.getCode())
+                        ? f.getDefaultMessage()
+                        : snakeCase(f.getField()) + " " + f.getDefaultMessage())
                 .collect(Collectors.joining("; "));
         return ResponseEntity.badRequest().body(ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail));
     }

@@ -73,10 +73,10 @@ Filters: `min_bedrooms`, `max_bedrooms`, `min_price`, `max_price`, `min_school_r
 | GET | `/properties` | Page of properties `{items,total,page,size}` | `page` (0-based), `size` (max 200), `sort=price,desc` (snake_case or camelCase names); unknown sort property is 400 |
 | GET | `/export.csv` | Filtered rows as CSV | `Content-Disposition: attachment` (`market-export.csv`) |
 | GET | `/export.pdf` | Summary line plus table, A4 landscape | `market-report.pdf` |
-| POST | `/what-if` | Price curve for one varied feature | Body below; cached; 400 on bad input or ml-api 400/422, 502 ml-api error, 503 unreachable |
+| POST | `/what-if` | Price curve for one varied feature | Body below; cached; 400 on bad input (incl. `from >= to`) or ml-api 400/422 (its `detail` is passed through, e.g. `year_built: Input should be ...`), 502 ml-api error, 503 unreachable |
 | GET | `/actuator/health` | Health | Only `health` is exposed |
 
-What-if body: `{"base": <7 features>, "feature": "square_footage", "from": 1000, "to": 2500, "steps": 25}`. `steps` is 2-50, `feature` must be one of the 7 names. The service builds one variant per step (integer features are rounded) and sends them to ml-api `/predict/batch` in one call. The response is `[{"value":..., "price":...}, ...]`.
+What-if body: `{"base": <7 features>, "feature": "square_footage", "from": 1000, "to": 2500, "steps": 25}`. `steps` is 2-50, `feature` must be one of the 7 names. The service builds one variant per step (integer features are rounded, and duplicate values after rounding are dropped, so you may get fewer than `steps` points) and sends them to ml-api `/predict/batch` in one call. The response is `[{"value":..., "price":...}, ...]`.
 
 Errors are Spring `ProblemDetail` (`application/problem+json`) with a `detail` string; see [ARCHITECTURE.md](ARCHITECTURE.md#errors).
 
@@ -89,8 +89,9 @@ cd market-api && ./gradlew test        # or: mise exec -- ./gradlew test -q
 | Test | Covers |
 |---|---|
 | `PropertyRepositoryTest` (`@DataJpaTest`) | CSV seed loads 50 rows; a Specification narrows results |
-| `MarketControllerTest` (`@WebMvcTest`, services mocked) | summary happy path, bad `by` is 400, unknown what-if feature is 400 with `detail`, `steps` out of range is 400, an invalid nested field is reported with a snake_case path (`base.square_footage`) |
-| `MlClientTest` (`MockRestServiceServer`) | prices returned in order; 5xx becomes a 502 `ResponseStatusException` |
+| `MarketControllerTest` (`@WebMvcTest`, services mocked) | summary happy path, bad `by` is 400, `from >= to` is 400 with `detail`, `steps` out of range is 400, an invalid nested field is reported with a snake_case path (`base.square_footage`) |
+| `WhatIfServiceTest` (plain JUnit, mocked `MlClient`) | even spacing incl. endpoints, integer rounding, dedup after rounding, base features preserved, unknown feature is 400, prices map to values in order |
+| `MlClientTest` (`MockRestServiceServer`) | prices in order; 422 list becomes a 400 `field: msg`; 400 string detail passes through; unparsable 422 falls back to the generic message; connection failure is 503; 5xx is 502; request id forwarded |
 | `ContractTest` | `HouseFeatures` annotations vs `contracts/house-features.schema.json`; `Segment`, sort allow-list, `MarketFilter` params and `WhatIfRequest.steps` vs `contracts/market.json`. Gradle passes the `../contracts` path as `contracts.dir` and tracks it as a test input |
 | `MarketApplicationTests` (full context, MockMvc) | `/summary` over the real seed |
 
