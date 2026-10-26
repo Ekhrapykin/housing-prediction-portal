@@ -14,10 +14,3 @@ export const marketPaths = {
 
 /** What next.config.ts proxies; everything else stays unreachable through the portal. */
 export const MARKET_PROXIED = Object.values(marketPaths);
-
-/** Sortable columns (contracts/market.json). Lives here because the search-params parsers need it without the client. */
-export const SORT_KEYS = [
-  "id", "square_footage", "bedrooms", "bathrooms", "year_built",
-  "lot_size", "distance_to_city_center", "school_rating", "price",
-] as const;
-export type SortKey = (typeof SORT_KEYS)[number];

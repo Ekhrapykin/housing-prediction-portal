@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useMarketFilters } from "@/hooks/use-market-filters";
-import { SEGMENT_KEYS, type SegmentKey } from "@/lib/types";
+import { SEGMENT_KEYS, type SegmentKey } from "@/lib/data/search-params";
 import { cn } from "@/lib/utils";
 
 type Filters = ReturnType<typeof useMarketFilters>;
-type NumberKey = "min_price" | "max_price" | "min_school_rating" | "max_distance";
+type NumberKey = "min_price" | "max_price" | "min_year_built" | "max_year_built" | "min_school_rating" | "max_distance";
 
 function NumberFilter({ name, label, step, filters }: { name: NumberKey; label: string; step?: string; filters: Filters }) {
   const value = filters.params[name];
@@ -28,6 +28,23 @@ function NumberFilter({ name, label, step, filters }: { name: NumberKey; label: 
   );
 }
 
+function BedroomsFilter({ name, label, filters }: { name: "min_bedrooms" | "max_bedrooms"; label: string; filters: Filters }) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={`f-${name}`}>{label}</Label>
+      <NativeSelect id={`f-${name}`} className="w-full" value={filters.params[name] ?? ""} onChange={(e) => filters.set({ [name]: e.target.value ? Number(e.target.value) : null })}>
+        <option value="">Any</option>
+        {[1, 2, 3, 4, 5, 6].map((n) => (
+          <option key={n} value={n}>
+            {n}
+            {name === "min_bedrooms" ? "+" : ""}
+          </option>
+        ))}
+      </NativeSelect>
+    </div>
+  );
+}
+
 /** Filter bar + the server-rendered dashboard (children), dimmed while the server re-renders. */
 export function Filters({ children }: { children: React.ReactNode }) {
   const filters = useMarketFilters();
@@ -36,21 +53,14 @@ export function Filters({ children }: { children: React.ReactNode }) {
       <form
         onSubmit={(e) => e.preventDefault()}
         aria-label="Market filters"
-        className="mb-6 grid gap-4 rounded-lg border bg-card p-4 sm:grid-cols-3 lg:grid-cols-7"
+        className="mb-6 grid gap-4 rounded-lg border bg-card p-4 sm:grid-cols-3 lg:grid-cols-5"
       >
-        <div className="space-y-1.5">
-          <Label htmlFor="f-min_bedrooms">Min bedrooms</Label>
-          <NativeSelect id="f-min_bedrooms" className="w-full" value={filters.params.min_bedrooms ?? ""} onChange={(e) => filters.set({ min_bedrooms: e.target.value ? Number(e.target.value) : null })}>
-            <option value="">Any</option>
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <option key={n} value={n}>
-                {n}+
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
+        <BedroomsFilter name="min_bedrooms" label="Min bedrooms" filters={filters} />
+        <BedroomsFilter name="max_bedrooms" label="Max bedrooms" filters={filters} />
         <NumberFilter name="min_price" label="Min price ($)" step="1000" filters={filters} />
         <NumberFilter name="max_price" label="Max price ($)" step="1000" filters={filters} />
+        <NumberFilter name="min_year_built" label="Min year built" step="1" filters={filters} />
+        <NumberFilter name="max_year_built" label="Max year built" step="1" filters={filters} />
         <NumberFilter name="min_school_rating" label="Min school rating" step="0.1" filters={filters} />
         <NumberFilter name="max_distance" label="Max distance (km)" step="0.5" filters={filters} />
         <div className="space-y-1.5">

@@ -22,15 +22,15 @@ export async function loadProperties(raw: SearchParams) {
 
 /**
  * Seed the client cache for a page with the SAME queryOptions the browser uses (same key and path, server fetcher).
- * prefetchQuery swallows fetch errors, and a failed query is left out of the dehydrated state, so the client
- * hook fetches again and renders its own error state.
+ * prefetchQuery swallows fetch errors; getQueryClient() dehydrates the failed query, so the client hydrates
+ * straight into the error state (and does not refetch on mount, see retryOnMount there).
  */
 async function prefetch(run: () => Promise<void>) {
   await connection(); // estimator reads are per-user; never prerender
   await run();
 }
 
-// retry: false because the render already waits for the transport timeout; the client query retries on its own.
+// retry: false because the render already waits for the transport timeout; "Try again" refetches in the browser.
 export const prefetchModelInfo = (qc: QueryClient) => prefetch(() => qc.prefetchQuery({ ...estimator.queries.modelInfo(), retry: false }));
 export const prefetchEstimates = (qc: QueryClient) => prefetch(() => qc.prefetchQuery({ ...estimator.queries.estimates(), retry: false }));
 export const prefetchEstimatesByIds = (qc: QueryClient, ids: number[]) =>

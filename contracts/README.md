@@ -5,7 +5,7 @@ The single source of truth for what is mirrored across services. No code generat
 | File | Describes | Mirrored in |
 |---|---|---|
 | `house-features.schema.json` | The 7 house features: names, integer vs number, bounds, all required, no extra properties (JSON Schema 2020-12) | ml-api `HouseFeatures`, estimator-api `HouseFeatures`, market-api `HouseFeatures` record, web `houseSchema` (zod) |
-| `market.json` | Segment keys, sortable property keys, filter parameter names and types, what-if `steps` bounds | market-api (`Segment`, `PropertyService` sort allow-list, `MarketFilter`, `WhatIfRequest`), web (`SEGMENT_KEYS`, `SORT_KEYS`, `filterParsers`, `WHAT_IF_STEPS`) |
+| `market.json` | Segment keys, sortable property keys, filter parameter names and types, what-if `steps` bounds | market-api (`Segment`, `PropertyService` sort allow-list, `MarketFilter`, `WhatIfRequest`), web (`SEGMENT_KEYS`, `SORT_KEYS`, `filterParsers` in `lib/data/search-params.ts`; `WHAT_IF_STEPS`) |
 
 ## The rule
 

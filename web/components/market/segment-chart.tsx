@@ -3,7 +3,8 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { money, priceTicks } from "@/lib/format";
-import type { SegmentKey, SegmentRow } from "@/lib/types";
+import type { SegmentKey } from "@/lib/data/search-params";
+import type { SegmentRow } from "@/lib/types";
 
 export function SegmentChart({ data, by }: { data: SegmentRow[]; by: SegmentKey }) {
   return (

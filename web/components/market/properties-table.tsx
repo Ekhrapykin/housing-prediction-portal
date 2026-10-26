@@ -15,8 +15,8 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { createSerializer } from "nuqs";
-import type { SortKey } from "@/lib/clients/market-paths";
-import { propertiesParsers } from "@/lib/data/search-params";
+import { urlPage } from "@/lib/clients/market";
+import { propertiesParsers, type MarketFilters, type SortKey } from "@/lib/data/search-params";
 import { money, number } from "@/lib/format";
 import type { Page, Property } from "@/lib/types";
 
@@ -69,10 +69,8 @@ function PageLink({ href, disabled, children }: { href: string; disabled: boolea
   );
 }
 
-type Filters = Omit<Parameters<typeof serialize>[1] & object, "sort" | "dir" | "page">;
-
 /** `filters` are the market filters from the URL; links keep them and change only `page` / `sort`. */
-export function PropertiesTable({ data, sort, dir, filters }: { data: Page<Property>; sort: SortKey | null; dir: "asc" | "desc"; filters: Filters }) {
+export function PropertiesTable({ data, sort, dir, filters }: { data: Page<Property>; sort: SortKey | null; dir: "asc" | "desc"; filters: MarketFilters }) {
   const table = useTable({
     features,
     columns,
@@ -81,7 +79,7 @@ export function PropertiesTable({ data, sort, dir, filters }: { data: Page<Prope
     getColumnCanGlobalFilter: () => true,
   });
 
-  const page = data.page + 1; // the backend is 0-based, the URL is 1-based
+  const page = urlPage(data.page);
   const lastPage = Math.max(Math.ceil(data.total / data.size), 1);
   const first = data.page * data.size + 1;
   const last = data.page * data.size + data.items.length;

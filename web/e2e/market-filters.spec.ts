@@ -13,6 +13,12 @@ test.describe("market filters", () => {
     await expect(page.locator("main")).toHaveText(/PROPERTIES\s*15\b/i, { useInnerText: true });
   });
 
+  test("min year built reaches the URL and narrows the KPI", async ({ page }) => {
+    await page.locator("#f-min_year_built").fill("2005");
+    await expect(page).toHaveURL(/min_year_built=2005/);
+    await expect(page.locator("main")).toHaveText(/PROPERTIES\s*14\b/i, { useInnerText: true });
+  });
+
   test("a typed float is kept and reaches the URL after the debounce", async ({ page }) => {
     const school = page.locator("#f-min_school_rating");
     await school.click();

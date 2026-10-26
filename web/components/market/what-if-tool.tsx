@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
 import { useWhatIf } from "@/hooks/use-what-if";
 import { estimator } from "@/lib/clients/browser";
-import { BOUNDS, FIELDS, FIELD_LABEL, estimateSchema, houseSchema, type EstimateFormValues } from "@/lib/house-schema";
+import { FIELDS, FIELD_LABEL, bounds, isInteger, estimateSchema, houseSchema, type EstimateFormValues } from "@/lib/house-schema";
 import { featureValue, number, signedMoney } from "@/lib/format";
 import type { FeatureName, FeatureStat, HouseFeatures, ModelInfo } from "@/lib/types";
 import { WHAT_IF_STEPS } from "@/lib/config";
@@ -30,11 +30,14 @@ const DELTA: Record<FeatureName, [number, string]> = {
   school_rating: [1, "school rating point"],
 };
 
-const clamp = (feature: FeatureName, v: number) => Math.min(Math.max(v, BOUNDS[feature][0]), BOUNDS[feature][1]);
+const clamp = (feature: FeatureName, v: number) => {
+  const [lo, hi] = bounds(feature);
+  return Math.min(Math.max(v, lo), hi);
+};
 
 function ranges(feature: FeatureName, s: FeatureStat) {
   const span = s.max - s.min || 1;
-  const integer = FIELDS.find((f) => f.name === feature)!.integer;
+  const integer = isInteger(feature);
   const round = (v: number) => (integer ? Math.round(v) : Math.round(v * 100) / 100);
   return {
     // Default: training range ± 20%; slider domain: ± 50%.
@@ -50,7 +53,7 @@ function typicalHouse(info: ModelInfo): HouseFeatures {
   const out = {} as HouseFeatures;
   for (const f of FIELDS) {
     const mean = info.feature_stats[f.name].mean;
-    out[f.name] = f.integer ? Math.round(mean) : Math.round(mean * 10) / 10;
+    out[f.name] = isInteger(f.name) ? Math.round(mean) : Math.round(mean * 10) / 10;
   }
   return out;
 }

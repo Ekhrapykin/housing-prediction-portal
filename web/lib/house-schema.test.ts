@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOUNDS, EXAMPLE, houseSchema } from "./house-schema";
-import type { FeatureName } from "./types";
+import { EXAMPLE, FIELDS, bounds, houseSchema, isInteger, type FeatureName } from "./house-schema";
 
 const ok = (name: FeatureName, v: number) => houseSchema.safeParse({ ...EXAMPLE, [name]: v }).success;
 
@@ -10,7 +9,7 @@ describe("houseSchema", () => {
   // Exclusive lower bounds (gt 0) are the integer-or-fraction cases: 0 is out, a tiny positive is in.
   const exclusiveLow: FeatureName[] = ["square_footage", "lot_size"];
 
-  describe.each(Object.entries(BOUNDS) as [FeatureName, [number, number]][])("%s", (name, [lo, hi]) => {
+  describe.each(FIELDS.map((f) => [f.name, ...bounds(f.name)] as const))("%s", (name, lo, hi) => {
     it("accepts both edges", () => {
       expect(ok(name, lo)).toBe(true);
       expect(ok(name, hi)).toBe(true);
@@ -19,6 +18,25 @@ describe("houseSchema", () => {
     it("rejects just below the minimum", () => {
       expect(ok(name, exclusiveLow.includes(name) ? 0 : lo - 0.5)).toBe(false);
     });
+  });
+
+  it("bounds() reads min and max from the schema", () => {
+    expect(bounds("bedrooms")).toEqual([0, 20]);
+    expect(bounds("year_built")).toEqual([1800, 2100]);
+    expect(bounds("school_rating")).toEqual([0, 10]);
+  });
+
+  it("bounds() floors an exclusive minimum (gt 0) at 1", () => {
+    expect(bounds("square_footage")).toEqual([1, 20_000]);
+    expect(bounds("lot_size")).toEqual([1, 1_000_000]);
+  });
+
+  it("isInteger() is true only for the .int() fields", () => {
+    expect(FIELDS.filter((f) => isInteger(f.name)).map((f) => f.name)).toEqual(["bedrooms", "year_built"]);
+  });
+
+  it("placeholders come from EXAMPLE", () => {
+    expect(FIELDS.every((f) => f.placeholder === String(EXAMPLE[f.name]))).toBe(true);
   });
 
   it("rejects school_rating 11", () => expect(ok("school_rating", 11)).toBe(false));

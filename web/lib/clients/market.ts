@@ -1,7 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { unstable_rethrow } from "next/navigation";
 import type { SearchParams } from "nuqs/server";
-import { loadSearchParams } from "@/lib/data/search-params";
+import { loadSearchParams, type MarketFilters, type SortKey } from "@/lib/data/search-params";
 import type { Page, Property, SegmentRow, Summary, WhatIfPoint } from "@/lib/types";
 import { MARKET_BASE, marketPaths as paths } from "./market-paths";
 import type { Transport } from "./transport";
@@ -18,18 +18,27 @@ async function attempt<T>(p: Promise<T>): Promise<Result<T>> {
   }
 }
 
-type Filters = Record<string, number | null>;
-
 /** Parsed filters (null = unset) to a query string for market-api; unset ones are left out. */
-export function filtersQuery(filters: Filters): URLSearchParams {
+export function filtersQuery(filters: MarketFilters): URLSearchParams {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(filters)) if (v !== null) sp.set(k, String(v));
   return sp;
 }
 
+/** Adds the paging of the properties list: the URL is 1-based and `sort` + `dir` are two params, market-api is 0-based with `sort=price,desc`. */
+export function pagingQuery(sp: URLSearchParams, { page, sort, dir }: { page: number; sort: SortKey | null; dir: "asc" | "desc" }, size: number) {
+  sp.set("page", String(page - 1));
+  sp.set("size", String(size));
+  if (sort) sp.set("sort", `${sort},${dir}`);
+  return sp;
+}
+/** The inverse of the page translation: market-api's page number back to the URL's. */
+export const urlPage = (backendPage: number) => backendPage + 1;
+
 // Scatter plot input. The dataset is 50 rows today, so 100 covers it; PriceScatter says so if it ever doesn't.
-const SCATTER_SIZE = 100;
-const PROPERTIES_PAGE_SIZE = 15;
+// Must stay <= market-api's max-page-size (application.yml), which clamps silently.
+export const SCATTER_SIZE = 100;
+export const PROPERTIES_PAGE_SIZE = 15;
 
 /**
  * Thinner than the estimator client: the reads are server loaders returning Result<T> (not TanStack prefetches,
@@ -60,14 +69,11 @@ export function createMarketClient(t: Transport) {
     },
     async properties(raw: SearchParams) {
       const { sort, dir, page, filters } = loadSearchParams(raw);
-      const sp = filtersQuery(filters);
-      sp.set("page", String(page - 1)); // the URL is 1-based, the backend 0-based
-      sp.set("size", String(PROPERTIES_PAGE_SIZE));
-      if (sort) sp.set("sort", `${sort},${dir}`); // market-api's own format
+      const sp = pagingQuery(filtersQuery(filters), { page, sort, dir }, PROPERTIES_PAGE_SIZE);
       return { filters, sort, dir, properties: await attempt(get<Page<Property>>(paths.properties, sp)) };
     },
     /** A plain link into the rewrite, so the browser handles the download. */
-    exportUrl(kind: "csv" | "pdf", filters: Filters): string {
+    exportUrl(kind: "csv" | "pdf", filters: MarketFilters): string {
       const q = filtersQuery(filters).toString();
       return `${MARKET_BASE}${kind === "csv" ? paths.exportCsv : paths.exportPdf}${q ? `?${q}` : ""}`;
     },

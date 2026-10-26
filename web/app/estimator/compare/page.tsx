@@ -1,8 +1,8 @@
-import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+import { HydrationBoundary } from "@tanstack/react-query";
 import type { Metadata } from "next";
 import { CompareView } from "@/components/estimator/compare-view";
 import { PageHeader } from "@/components/page-header";
-import { getQueryClient } from "@/lib/data/query-client";
+import { dehydrateQueries, getQueryClient } from "@/lib/data/query-client";
 import { prefetchEstimatesByIds } from "@/lib/clients/server";
 
 export const metadata: Metadata = { title: "Compare estimates" };
@@ -19,7 +19,7 @@ export default async function ComparePage({ searchParams }: PageProps<"/estimato
   return (
     <>
       <PageHeader title="Compare" description="Properties side by side. The best value in each row is highlighted." />
-      <HydrationBoundary state={dehydrate(qc)}>
+      <HydrationBoundary state={dehydrateQueries(qc)}>
         <CompareView ids={parsed} />
       </HydrationBoundary>
     </>

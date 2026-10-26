@@ -2,11 +2,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { SORT_KEYS } from "@/lib/clients/market-paths";
 import { WHAT_IF_STEPS } from "@/lib/config";
-import { filterParsers } from "@/lib/data/search-params";
+import { SEGMENT_KEYS, SORT_KEYS, filterParsers } from "@/lib/data/search-params";
 import { houseSchema } from "@/lib/house-schema";
-import { SEGMENT_KEYS } from "@/lib/types";
 
 const contract = (f: string) => JSON.parse(readFileSync(new URL(`../../contracts/${f}`, import.meta.url), "utf8"));
 const house = contract("house-features.schema.json");

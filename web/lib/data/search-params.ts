@@ -1,6 +1,15 @@
-import { createLoader, type SearchParams, createParser, parseAsFloat, parseAsInteger, parseAsStringLiteral } from "nuqs/server";
-import { SEGMENT_KEYS } from "@/lib/types";
-import { SORT_KEYS } from "@/lib/clients/market-paths";
+import { createLoader, type SearchParams, createParser, type inferParserType, parseAsFloat, parseAsInteger, parseAsStringLiteral } from "nuqs/server";
+
+// The market query vocabulary (contracts/market.json; lib/contracts.test.ts compares them). Kept out of
+// clients/market-paths.ts, which next.config.ts imports and which must stay free of nuqs and React.
+export const SEGMENT_KEYS = ["BEDROOMS", "SCHOOL_RATING", "DISTANCE", "DECADE"] as const;
+export type SegmentKey = (typeof SEGMENT_KEYS)[number];
+/** Sortable columns. */
+export const SORT_KEYS = [
+  "id", "square_footage", "bedrooms", "bathrooms", "year_built",
+  "lot_size", "distance_to_city_center", "school_rating", "price",
+] as const;
+export type SortKey = (typeof SORT_KEYS)[number];
 
 /** Every URL param of the market app, shared by the server loader and the client hooks. */
 export const filterParsers = {
@@ -13,6 +22,9 @@ export const filterParsers = {
   min_school_rating: parseAsFloat,
   max_distance: parseAsFloat,
 };
+
+/** The parsed filters (null = unset). */
+export type MarketFilters = inferParserType<typeof filterParsers>;
 
 /** 1-based `?page=`; anything below 1 or unparseable falls back to the default (1). */
 const parseAsPage = createParser({

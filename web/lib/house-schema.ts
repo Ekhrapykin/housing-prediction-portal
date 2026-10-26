@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { FeatureName, HouseFeatures } from "./types";
 
 // An empty number input arrives as NaN (valueAsNumber), so report it as missing, not as "not a number".
 const num = (name: string) =>
@@ -16,35 +15,41 @@ export const houseSchema = z.object({
   school_rating: num("School rating").min(0, "At least 0").max(10, "At most 10"),
 });
 
+export type HouseFeatures = z.infer<typeof houseSchema>;
+export type FeatureName = keyof HouseFeatures;
+
 export const estimateSchema = houseSchema.extend({
   label: z.string().max(80, "At most 80 characters").optional(),
 });
 export type EstimateFormValues = z.infer<typeof estimateSchema>;
-
-export const FIELDS: { name: FeatureName; label: string; unit: string; step: string; placeholder: string; integer: boolean }[] = [
-  { name: "square_footage", label: "Square footage", unit: "sq ft", step: "1", placeholder: "1550", integer: false },
-  { name: "bedrooms", label: "Bedrooms", unit: "", step: "1", placeholder: "3", integer: true },
-  { name: "bathrooms", label: "Bathrooms", unit: "", step: "0.5", placeholder: "2", integer: false },
-  { name: "year_built", label: "Year built", unit: "", step: "1", placeholder: "1997", integer: true },
-  { name: "lot_size", label: "Lot size", unit: "sq ft", step: "1", placeholder: "6800", integer: false },
-  { name: "distance_to_city_center", label: "Distance to city center", unit: "km", step: "0.1", placeholder: "4.1", integer: false },
-  { name: "school_rating", label: "School rating", unit: "/ 10", step: "0.1", placeholder: "7.6", integer: false },
-];
-
-export const FIELD_LABEL = Object.fromEntries(FIELDS.map((f) => [f.name, f.label])) as Record<FeatureName, string>;
 
 export const EXAMPLE: HouseFeatures = {
   square_footage: 1550, bedrooms: 3, bathrooms: 2, year_built: 1997,
   lot_size: 6800, distance_to_city_center: 4.1, school_rating: 7.6,
 };
 
-/** Hard limits per feature (what the backends accept); used to clamp what-if ranges. */
-export const BOUNDS: Record<FeatureName, [number, number]> = {
-  square_footage: [1, 20_000],
-  bedrooms: [0, 20],
-  bathrooms: [0, 20],
-  year_built: [1800, 2100],
-  lot_size: [1, 1_000_000],
-  distance_to_city_center: [0, 500],
-  school_rating: [0, 10],
+type Field = { name: FeatureName; label: string; unit: string; step: string };
+const FIELD_DEFS: Field[] = [
+  { name: "square_footage", label: "Square footage", unit: "sq ft", step: "1" },
+  { name: "bedrooms", label: "Bedrooms", unit: "", step: "1" },
+  { name: "bathrooms", label: "Bathrooms", unit: "", step: "0.5" },
+  { name: "year_built", label: "Year built", unit: "", step: "1" },
+  { name: "lot_size", label: "Lot size", unit: "sq ft", step: "1" },
+  { name: "distance_to_city_center", label: "Distance to city center", unit: "km", step: "0.1" },
+  { name: "school_rating", label: "School rating", unit: "/ 10", step: "0.1" },
+];
+/** Form fields in display order; the placeholder is the EXAMPLE value. */
+export const FIELDS = FIELD_DEFS.map((f) => ({ ...f, placeholder: String(EXAMPLE[f.name]) }));
+
+export const FIELD_LABEL = Object.fromEntries(FIELDS.map((f) => [f.name, f.label])) as Record<FeatureName, string>;
+
+// Bounds and integer-ness are read from the schema itself, so they can't drift from the zod rules.
+const jsonProps = z.toJSONSchema(houseSchema).properties as Record<FeatureName, { type: string; minimum?: number; exclusiveMinimum?: number; maximum: number }>;
+
+/** [min, max] of a feature (what the backends accept), for clamping. An exclusive minimum (`gt(0)`) becomes the next whole number (1). */
+export const bounds = (name: FeatureName): [number, number] => {
+  const { minimum, exclusiveMinimum, maximum } = jsonProps[name];
+  return [minimum ?? Math.floor(exclusiveMinimum!) + 1, maximum];
 };
+
+export const isInteger = (name: FeatureName) => jsonProps[name].type === "integer";
